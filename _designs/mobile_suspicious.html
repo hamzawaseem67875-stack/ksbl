@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Inter:wght@100..900&family=Noto+Sans+Arabic:wght@100..900&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Outfit:wght@100..900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-lowest": "#070e1d",
+                    "on-secondary": "#472a00",
+                    "inverse-surface": "#dce2f7",
+                    "on-surface": "#dce2f7",
+                    "on-secondary-fixed": "#2a1700",
+                    "secondary": "#ffb95f",
+                    "on-primary-fixed-variant": "#00513f",
+                    "background": "#0c1322",
+                    "surface-container-highest": "#2e3545",
+                    "surface-bright": "#323949",
+                    "on-background": "#dce2f7",
+                    "surface-variant": "#2e3545",
+                    "outline": "#85948d",
+                    "on-error": "#690005",
+                    "tertiary-container": "#ffa39c",
+                    "tertiary-fixed-dim": "#ffb3ad",
+                    "surface-dim": "#0c1322",
+                    "outline-variant": "#3b4a44",
+                    "on-primary-fixed": "#002118",
+                    "inverse-on-surface": "#293040",
+                    "secondary-container": "#ee9800",
+                    "error": "#ffb4ab",
+                    "on-primary": "#00382b",
+                    "primary-fixed": "#55fcd0",
+                    "primary-fixed-dim": "#28dfb5",
+                    "surface-tint": "#28dfb5",
+                    "on-secondary-container": "#5b3800",
+                    "tertiary-fixed": "#ffdad7",
+                    "tertiary": "#ffcbc6",
+                    "primary": "#46f1c5",
+                    "on-surface-variant": "#bacac2",
+                    "inverse-primary": "#006b55",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "on-tertiary-fixed-variant": "#930013",
+                    "on-error-container": "#ffdad6",
+                    "surface-container": "#191f2f",
+                    "primary-container": "#00d4aa",
+                    "on-primary-container": "#005643",
+                    "surface-container-high": "#232a3a",
+                    "error-container": "#93000a",
+                    "secondary-fixed": "#ffddb8",
+                    "on-tertiary-container": "#9b0015",
+                    "surface": "#0c1322",
+                    "surface-container-low": "#141b2b",
+                    "on-tertiary": "#68000a",
+                    "secondary-fixed-dim": "#ffb95f",
+                    "on-tertiary-fixed": "#410004"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-md": "16px",
+                    "container-margin": "20px",
+                    "stack-sm": "8px",
+                    "gutter": "16px",
+                    "glass-padding": "24px",
+                    "stack-lg": "32px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Outfit"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Outfit"],
+                    "body-lg": ["Inter"],
+                    "urdu-body": ["Noto Sans Arabic"],
+                    "headline-lg-mobile": ["Outfit"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "urdu-body": ["18px", {"lineHeight": "32px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .amber-glow {
+            box-shadow: 0 0 30px rgba(238, 152, 0, 0.15);
+        }
+        .pulse-amber {
+            animation: pulse-amber 2s infinite ease-in-out;
+        }
+        @keyframes pulse-amber {
+            0%, 100% { opacity: 0.15; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(1.05); }
+        }
+        .urdu-text {
+            font-family: 'Noto Sans Arabic', serif;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen font-body-md selection:bg-secondary-container selection:text-on-secondary-container overflow-x-hidden">
+<!-- Top App Bar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-margin py-stack-sm bg-surface/10 backdrop-blur-xl dark:bg-surface-dim/10 border-b border-outline-variant/20 dark:border-outline/10">
+<h1 class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed-dim">ShelfWatch</h1>
+<div class="flex gap-4">
+<button class="material-symbols-outlined text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/20 dark:hover:bg-surface-bright/20 p-2 rounded-full transition-all">language</button>
+<button class="material-symbols-outlined text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/20 dark:hover:bg-surface-bright/20 p-2 rounded-full transition-all">account_circle</button>
+</div>
+</header>
+<main class="pt-24 pb-32 px-container-margin relative min-h-screen">
+<!-- Ambient Amber Glow -->
+<div class="absolute inset-0 pointer-events-none overflow-hidden">
+<div class="pulse-amber absolute -top-20 -left-20 w-96 h-96 bg-secondary-container rounded-full blur-[120px]"></div>
+<div class="pulse-amber absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-96 bg-secondary/10 rounded-full blur-[150px]"></div>
+</div>
+<div class="relative z-10 flex flex-col gap-stack-lg max-w-md mx-auto">
+<!-- Verdict Header Card -->
+<div class="glass-card rounded-xl p-glass-padding amber-glow text-center flex flex-col items-center gap-stack-md">
+<div class="w-20 h-20 bg-secondary-container/20 rounded-full flex items-center justify-center border-2 border-secondary/40">
+<span class="material-symbols-outlined text-[48px] text-secondary">warning</span>
+</div>
+<div class="space-y-1">
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile text-secondary">Suspicious / مشکوک</h2>
+<p class="text-on-surface-variant text-body-md">Potential anomaly detected in product packaging.</p>
+</div>
+</div>
+<!-- Confidence Section -->
+<div class="glass-card rounded-xl p-glass-padding flex flex-col gap-stack-md">
+<div class="flex justify-between items-center">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase">Confidence Score</span>
+<span class="text-headline-md font-headline-md text-secondary">73%</span>
+</div>
+<div class="h-4 w-full bg-surface-container-highest rounded-full overflow-hidden border border-white/5">
+<div class="h-full bg-gradient-to-r from-secondary/40 to-secondary w-[73%] rounded-full shadow-[0_0_10px_rgba(255,185,95,0.5)]"></div>
+</div>
+<p class="text-body-md text-on-surface/80 italic">Analysis indicates several irregularities compared to official brand assets.</p>
+</div>
+<!-- Reason Chips & Bento Grid -->
+<div class="grid grid-cols-2 gap-gutter">
+<div class="glass-card rounded-xl p-stack-md flex flex-col gap-stack-sm border-l-4 border-secondary">
+<span class="material-symbols-outlined text-secondary">print_disabled</span>
+<span class="text-label-caps font-label-caps text-on-surface">Blurry Batch Code</span>
+</div>
+<div class="glass-card rounded-xl p-stack-md flex flex-col gap-stack-sm border-l-4 border-secondary">
+<span class="material-symbols-outlined text-secondary">align_horizontal_center</span>
+<span class="text-label-caps font-label-caps text-on-surface">Logo Misalignment</span>
+</div>
+</div>
+<!-- Product Details Snapshot -->
+<div class="glass-card rounded-xl overflow-hidden">
+<div class="w-full h-40 bg-cover bg-center border-b border-outline-variant/20" data-alt="A macro close-up photograph of a pharmaceutical product bottle under clinical blue lighting. The focus is sharp on a slightly smudged batch code and a metallic hologram sticker that appears dull. The background is a dark, high-tech laboratory environment with deep navy and teal accents reflecting off glass surfaces. The visual style is professional, detailed, and emphasizes a security audit atmosphere." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuALEEXRqpF_p00QQfD5OtZmKdzql0XwPPwk8W07yKawhQKYGUYYeDgwBiucO5BcRlp-lz99-yld_Zp_lMCIFfZd8t1L5SD2-Mi9QA1NuUpt1avkMFGVPdhHyDFHrYEtxhZE-CJLQY4akD3EgbAsxW8wnpZ6l4D6kTvRpY9QZc6Z5JzP11uhBl9S3GWiE1ZkfZl6-LzbNujhCbLTo4zOyl-nF4aNIUJXOaVtPNiro4NdrERFnBUIWhI9Cg')"></div>
+<div class="p-glass-padding grid grid-cols-2 gap-stack-md">
+<div>
+<p class="text-label-caps font-label-caps text-on-surface-variant uppercase">Brand</p>
+<p class="text-body-md font-bold text-on-surface">HealthCare Pro</p>
+</div>
+<div>
+<p class="text-label-caps font-label-caps text-on-surface-variant uppercase">Batch ID</p>
+<p class="text-body-md font-bold text-on-surface">XP-992-BLR</p>
+</div>
+</div>
+</div>
+<!-- Urgent Red Warning -->
+<div class="bg-error-container/20 border border-error/30 rounded-xl p-glass-padding flex items-start gap-stack-md">
+<span class="material-symbols-outlined text-error mt-1" style="font-variation-settings: 'FILL' 1;">gpp_maybe</span>
+<div class="flex flex-col gap-1">
+<p class="text-body-md font-bold text-error">Critical Action Required</p>
+<p class="text-body-md text-on-error-container">Do not sell this product. Keep it isolated and immediately report the incident to the brand protection department.</p>
+</div>
+</div>
+<!-- CTAs -->
+<div class="flex flex-col gap-stack-md">
+<button class="w-full h-14 bg-error-container text-on-error-container font-headline-md rounded-xl shadow-[0_0_20px_rgba(147,0,10,0.2)] active:scale-95 transition-all flex items-center justify-center gap-stack-sm">
+<span class="material-symbols-outlined">report</span>
+                    Report Product
+                </button>
+<button class="w-full h-14 bg-surface-container-high text-on-surface border border-outline-variant/30 font-headline-md rounded-xl active:scale-95 transition-all flex items-center justify-center gap-stack-sm">
+<span class="material-symbols-outlined">qr_code_scanner</span>
+                    Scan Another
+                </button>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe h-20 bg-surface-container-low/30 backdrop-blur-lg dark:bg-surface-container-low/40 border-t border-outline-variant/20 dark:border-outline/10 shadow-lg dark:shadow-none rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant p-2 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="text-label-caps font-label-caps">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container/20 text-primary dark:text-primary-fixed-dim rounded-full p-2 scale-90 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">document_scanner</span>
+<span class="text-label-caps font-label-caps">Scan</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant p-2 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="text-label-caps font-label-caps">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant p-2 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-caps font-label-caps">Settings</span>
+</a>
+</nav>
+<script>
+        // Subtle micro-interaction for cards on scroll
+        const cards = document.querySelectorAll('.glass-card');
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        cards.forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)';
+            observer.observe(card);
+        });
+    </script>
+</body></html>

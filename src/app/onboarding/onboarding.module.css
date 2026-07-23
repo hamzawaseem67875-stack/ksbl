@@ -1,0 +1,419 @@
+/* onboarding.module.css */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+}
+
+/* Background glows */
+.bgGlow1 {
+  position: fixed;
+  top: -20%;
+  left: -10%;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(70, 241, 197, 0.07) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bgGlow2 {
+  position: fixed;
+  bottom: -20%;
+  right: -10%;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 185, 95, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Main Card */
+.card {
+  position: relative;
+  z-index: 1;
+  background: rgba(25, 31, 47, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(70, 241, 197, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cardScroll {
+  padding: 40px 40px 24px;
+  flex: 1;
+}
+
+/* Step Dots */
+.dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 40px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+}
+
+.dotActive {
+  width: 28px;
+  border-radius: 4px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px rgba(70, 241, 197, 0.5);
+}
+
+.dotDone {
+  background: rgba(70, 241, 197, 0.4);
+}
+
+/* Navigation */
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 40px 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-inter), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backBtn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-on-surface);
+}
+
+.nextBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 28px;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 20px rgba(70, 241, 197, 0.3);
+}
+
+.nextBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(70, 241, 197, 0.45);
+}
+
+.nextBtn:active {
+  transform: scale(0.97);
+}
+
+/* Step Content */
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stepTitle {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-on-surface);
+}
+
+.stepBody {
+  font-size: 15px;
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-inter), sans-serif;
+  line-height: 1.6;
+}
+
+/* Step 0 — Welcome */
+.logoWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.logoIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(70, 241, 197, 0.15), rgba(70, 241, 197, 0.03));
+  border: 1.5px solid rgba(70, 241, 197, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  box-shadow: 0 8px 32px rgba(70, 241, 197, 0.15);
+}
+
+.logoText {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--color-on-surface);
+  letter-spacing: -0.02em;
+}
+
+.logoTagline {
+  font-size: 13px;
+  color: var(--color-primary);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.welcomeCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.featureIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(70, 241, 197, 0.1);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.featureLabel {
+  font-size: 14px;
+  color: var(--color-on-surface);
+  font-family: var(--font-inter), sans-serif;
+}
+
+/* Step 1 — How to Scan */
+.scanSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+
+.scanStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 0;
+  position: relative;
+}
+
+.scanStepNumber {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 4px;
+  background: var(--color-surface);
+  position: relative;
+  z-index: 2;
+}
+
+.scanConnector {
+  position: absolute;
+  left: 13px;
+  top: 44px;
+  width: 2px;
+  height: calc(100% - 12px);
+  opacity: 0.4;
+  z-index: 1;
+}
+
+.scanStepIcon {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scanStepText {
+  flex: 1;
+  padding-top: 4px;
+}
+
+.scanStepTitle {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.scanStepDesc {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-inter), sans-serif;
+  line-height: 1.5;
+}
+
+/* Step 2 — Camera Permission */
+.permissionIllustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.permissionRing {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(70, 241, 197, 0.3);
+  background: rgba(70, 241, 197, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  transition: all 0.4s ease;
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.permissionGranted {
+  border-color: var(--color-primary) !important;
+  background: rgba(70, 241, 197, 0.12) !important;
+  box-shadow: 0 0 32px rgba(70, 241, 197, 0.25) !important;
+  animation: none !important;
+}
+
+.permissionDenied {
+  border-color: var(--color-error) !important;
+  background: rgba(255, 180, 171, 0.08) !important;
+  color: var(--color-error) !important;
+  animation: none !important;
+}
+
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(70, 241, 197, 0.2); }
+  50% { box-shadow: 0 0 0 16px rgba(70, 241, 197, 0); }
+}
+
+.permissionCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.permissionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.permissionText {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-inter), sans-serif;
+}
+
+.cameraBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 20px rgba(70, 241, 197, 0.3);
+  width: 100%;
+}
+
+.cameraBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(70, 241, 197, 0.45);
+}
+
+.statusMessage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-inter), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}

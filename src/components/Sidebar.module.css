@@ -1,0 +1,158 @@
+.sidebar {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    z-index: 40;
+    width: 16rem;
+    background-color: var(--color-surface-container-lowest);
+    border-right: 1px solid rgba(59, 74, 68, 0.15);
+    padding-top: 5rem;
+  }
+}
+
+.sidebarContent {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.agentProfile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(59, 74, 68, 0.15);
+}
+
+.agentAvatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: rgba(70, 241, 197, 0.1);
+  border: 1px solid rgba(70, 241, 197, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.agentRole {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.agentName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  margin: 0;
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebarLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.5rem;
+  color: var(--color-on-surface-variant);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.sidebarLink:hover {
+  background-color: rgba(46, 53, 69, 0.5);
+  color: var(--color-on-surface);
+}
+
+.sidebarLinkActive {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.5rem;
+  color: var(--color-primary);
+  font-weight: 700;
+  border-left: 3px solid var(--color-primary);
+  background-color: rgba(0, 212, 170, 0.07);
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.navLabel {
+  font-family: var(--font-inter), sans-serif;
+}
+
+.sidebarFooter {
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid rgba(59, 74, 68, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exportBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem;
+  background: rgba(70, 241, 197, 0.1);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(70, 241, 197, 0.2);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exportBtn:hover {
+  background: rgba(70, 241, 197, 0.15);
+  box-shadow: 0 0 15px rgba(70, 241, 197, 0.15);
+}
+
+.scanBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scanBtn:hover {
+  box-shadow: 0 0 20px rgba(70, 241, 197, 0.35);
+}

@@ -1,0 +1,284 @@
+.page {
+  padding: 2rem;
+  max-width: 1400px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.25rem;
+}
+.subtitle {
+  font-size: 14px;
+  color: var(--color-on-surface-variant);
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.filterBtn, .exportBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.5rem;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-inter), sans-serif;
+}
+.filterBtn {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--color-on-surface-variant);
+}
+.filterBtn:hover { background: rgba(255,255,255,0.07); }
+.exportBtn {
+  background: var(--color-primary);
+  border: none;
+  color: var(--color-on-primary);
+}
+.exportBtn:hover { box-shadow: 0 0 20px rgba(70,241,197,0.3); }
+
+/* KPI */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpiCard {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+.kpiCard:hover {
+  background: rgba(255,255,255,0.05);
+  transform: translateY(-2px);
+}
+
+.kpiTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.kpiLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+}
+.kpiIcon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kpiIcon .material-symbols-outlined { font-size: 20px; }
+.kpiValue {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+.kpiDelta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Chart Row */
+.chartRow {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 900px) {
+  .chartRow { grid-template-columns: 1fr; }
+}
+
+.chartCard, .donutCard, .tableCard {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+}
+
+.cardTitle {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin-bottom: 1.25rem;
+}
+
+/* Bar Chart */
+.barChart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 150px;
+  gap: 0.5rem;
+}
+.barGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex: 1;
+  height: 100%;
+}
+.bar {
+  width: 100%;
+  max-width: 40px;
+  background: linear-gradient(to top, var(--color-primary-container), var(--color-primary));
+  border-radius: 0.25rem 0.25rem 0 0;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 10px rgba(70,241,197,0.15);
+}
+.barLabel {
+  font-size: 11px;
+  color: var(--color-on-surface-variant);
+  font-weight: 500;
+}
+
+/* Donut Chart */
+.donutChart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 140px;
+  margin-bottom: 1.25rem;
+}
+.donutRing {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--color-primary) 0% 93.4%,
+    var(--color-secondary) 93.4% 95%,
+    var(--color-error) 95% 100%
+  );
+  position: relative;
+}
+.donutRing::after {
+  content: '';
+  position: absolute;
+  inset: 20px;
+  background: var(--color-surface-container-low);
+  border-radius: 50%;
+}
+.donutCenter {
+  position: absolute;
+  text-align: center;
+}
+.donutValue {
+  display: block;
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.donutSub {
+  font-size: 11px;
+  color: var(--color-on-surface-variant);
+}
+.donutLegend { display: flex; flex-direction: column; gap: 0.6rem; }
+.legendItem { display: flex; align-items: center; gap: 0.6rem; }
+.legendDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legendLabel { font-size: 13px; color: var(--color-on-surface-variant); flex: 1; }
+.legendPct { font-size: 13px; font-weight: 700; }
+
+/* Table */
+.tableHeader { display: flex; justify-content: space-between; align-items: center; }
+.viewAllLink {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 13px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.tableWrapper { overflow-x: auto; margin-top: 1rem; }
+.table { width: 100%; border-collapse: collapse; }
+.th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(59,74,68,0.2);
+}
+.tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s;
+}
+.tr:hover { background: rgba(255,255,255,0.025); }
+.td {
+  padding: 0.875rem 1rem;
+  font-size: 14px;
+  color: var(--color-on-surface);
+  vertical-align: middle;
+}
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.confidenceCell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.miniBar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.miniBarFill {
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.8;
+}

@@ -1,0 +1,57 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-family: var(--font-inter), sans-serif;
+}
+
+/* Sizes */
+.sm { padding: 0.25rem 0.75rem; font-size: 12px; }
+.md { padding: 0.5rem 1.25rem; font-size: 14px; }
+.lg { padding: 0.75rem 1.75rem; font-size: 18px; }
+.sm .icon { font-size: 16px; }
+.md .icon { font-size: 20px; }
+.lg .icon { font-size: 28px; }
+
+/* Variants */
+.genuine {
+  background: rgba(70, 241, 197, 0.15);
+  color: var(--color-primary);
+  border: 1px solid rgba(70, 241, 197, 0.3);
+  box-shadow: 0 0 20px rgba(0, 212, 170, 0.15);
+}
+
+.suspicious {
+  background: rgba(238, 152, 0, 0.15);
+  color: var(--color-secondary);
+  border: 1px solid rgba(255, 185, 95, 0.3);
+  box-shadow: 0 0 20px rgba(238, 152, 0, 0.15);
+}
+
+.counterfeit {
+  background: rgba(255, 180, 171, 0.15);
+  color: var(--color-error);
+  border: 1px solid rgba(255, 180, 171, 0.3);
+  box-shadow: 0 0 20px rgba(255, 180, 171, 0.1);
+}
+
+.unverified {
+  background: rgba(186, 202, 194, 0.1);
+  color: var(--color-on-surface-variant);
+  border: 1px solid rgba(133, 148, 141, 0.3);
+}
+
+.processing {
+  background: rgba(40, 223, 181, 0.1);
+  color: var(--color-primary-fixed-dim);
+  border: 1px solid rgba(40, 223, 181, 0.2);
+  animation: processingPulse 2s ease-in-out infinite;
+}
+
+@keyframes processingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
