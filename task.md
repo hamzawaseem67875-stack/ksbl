@@ -1,0 +1,27 @@
+# ShelfWatch Backend & Integration — Task List
+
+- [x] Install dependencies (prisma, zod, @vercel/blob, @anthropic-ai/sdk)
+- [x] Create prisma/schema.prisma
+- [x] Create prisma/seed.ts
+- [x] Create src/lib/db.ts
+- [x] Create src/lib/ocr.ts
+- [x] Create src/lib/cv.ts
+- [x] Create src/lib/translate.ts
+- [x] Create src/lib/verifyProduct.ts
+- [x] Create src/app/api/scan/route.ts
+- [x] Create src/app/api/dashboard/stats/route.ts
+- [x] Create src/app/api/dashboard/heatmap/route.ts
+- [x] Create src/app/api/report/route.ts
+- [x] Create src/app/api/whatsapp-webhook/route.ts
+- [x] Create .env.example
+- [x] Update README.md
+- [x] Update next.config.ts (serverExternalPackages for Prisma)
+- [x] Run prisma generate + tsc check
+- [x] Wire scan page to POST /api/scan
+- [x] Wire dashboard page to live API endpoints
+- [x] Add GET /api/scans API route for history page
+- [x] Wire unverified page to API client and session storage
+- [x] Wire simplified page to API client and session storage
+- [x] Wire scan history page to dynamic scans API
+- [x] Wire analytics page to statistics and heatmap APIs
+- [x] Wire dashboard overview page to live incident panel
