@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum ScannedByRole {
+  shopkeeper
+  consumer
+}
+
+enum Verdict {
+  genuine
+  suspicious
+  unverified
+}
+
+enum ReportStatus {
+  pending
+  investigating
+  resolved
+  dismissed
+}
+
+enum SubscriptionTier {
+  free
+  starter
+  professional
+  enterprise
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model Brand {
+  id                String           @id @default(cuid())
+  name              String
+  contact_email     String           @unique
+  subscription_tier SubscriptionTier @default(free)
+  created_at        DateTime         @default(now())
+
+  reports Report[]
+}
+
+model Product {
+  id                      String   @id @default(cuid())
+  sku                     String   @unique
+  brand_name              String
+  product_name            String
+  reference_batch_pattern String   // regex or prefix, e.g. "^XP-[0-9]{3}-KHI"
+  reference_image_url     String?
+  avg_unit_price_pkr      Float    @default(0) // used for estimated_losses calculation
+  created_at              DateTime @default(now())
+
+  scans Scan[]
+}
+
+model Scan {
+  id               String        @id @default(cuid())
+  product_id       String?       // nullable — no match found = unverified
+  scanned_by_role  ScannedByRole @default(consumer)
+  image_url        String
+  extracted_batch  String?
+  extracted_mfg_date String?
+  extracted_mrp    String?
+  ocr_raw_json     Json?
+  cv_anomaly_score Float?        // 0.0 (genuine) → 1.0 (suspicious)
+  verdict          Verdict       @default(unverified)
+  confidence       Float         @default(0)
+  // Location — stored but anonymized in aggregate dashboard queries
+  latitude         Float?
+  longitude        Float?
+  area_name        String?
+  created_at       DateTime      @default(now())
+
+  product  Product? @relation(fields: [product_id], references: [id])
+  reports  Report[]
+
+  @@index([product_id])
+  @@index([verdict])
+  @@index([area_name])
+  @@index([created_at])
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  scan_id    String
+  brand_id   String
+  status     ReportStatus @default(pending)
+  notes      String?
+  created_at DateTime     @default(now())
+
+  scan  Scan  @relation(fields: [scan_id], references: [id])
+  brand Brand @relation(fields: [brand_id], references: [id])
+
+  @@index([scan_id])
+  @@index([brand_id])
+  @@index([status])
+}
