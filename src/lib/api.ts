@@ -1,0 +1,251 @@
+/**
+ * src/lib/api.ts
+ *
+ * Typed client for all ShelfWatch API endpoints.
+ * All API calls go through these helpers — no raw fetch() scattered in components.
+ *
+ * Design rules:
+ *  - Always returns { data } or { error } — never throws to the caller.
+ *  - Every function is typed end-to-end so TypeScript catches contract mismatches.
+ *  - No API keys client-side — everything routes through Next.js API routes.
+ */
+
+// ─── Shared types (mirror API contract exactly) ───────────────────────────────
+
+export type VerdictType = 'genuine' | 'suspicious' | 'unverified';
+export type ScannedByRole = 'shopkeeper' | 'consumer';
+
+export interface ScanResult {
+  scan_id: string;
+  verdict: VerdictType;
+  confidence: number;       // 0–1
+  reason: string;
+  english_text: string;
+  urdu_text: string;
+  product_name: string | null;
+  brand_name: string | null;
+  extracted_batch: string | null;
+  extracted_mfg_date: string | null;
+  extracted_mrp: string | null;
+  cv_anomaly_score: number | null;
+}
+
+export interface ReportResult {
+  report_id: string;
+  scan_id: string;
+  status: string;
+  already_reported?: boolean;
+}
+
+export interface DashboardStats {
+  total_scans: number;
+  genuine_count: number;
+  suspicious_count: number;
+  unverified_count: number;
+  suspicious_rate: number;          // percentage, e.g. 40.00
+  estimated_losses_pkr: number;
+  date_range: { from: string; to: string };
+}
+
+export interface HeatmapCluster {
+  area_name: string;
+  latitude: number | null;
+  longitude: number | null;
+  report_count: number;
+  suspicious_count: number;
+  suspicious_rate: number;
+}
+
+export interface ScanHistoryItem {
+  id: string;
+  verdict: VerdictType;
+  confidence: number;
+  area_name: string | null;
+  product_name: string | null;
+  brand_name: string | null;
+  extracted_batch: string | null;
+  image_url: string;
+  created_at: string;
+}
+
+// ─── Result wrapper ───────────────────────────────────────────────────────────
+
+type ApiResult<T> =
+  | { data: T; error: null }
+  | { data: null; error: string };
+
+function ok<T>(data: T): ApiResult<T> {
+  return { data, error: null };
+}
+function err<T>(message: string): ApiResult<T> {
+  return { data: null, error: message };
+}
+
+// ─── POST /api/scan ───────────────────────────────────────────────────────────
+
+export interface ScanInput {
+  imageFile: File;
+  barcode?: string;
+  role?: ScannedByRole;
+  latitude?: number;
+  longitude?: number;
+  area_name?: string;
+}
+
+export async function postScan(input: ScanInput): Promise<ApiResult<ScanResult>> {
+  try {
+    const form = new FormData();
+    form.append('image', input.imageFile);
+    if (input.barcode) form.append('barcode', input.barcode);
+    form.append('scanned_by_role', input.role ?? 'consumer');
+    if (input.latitude != null) form.append('latitude', String(input.latitude));
+    if (input.longitude != null) form.append('longitude', String(input.longitude));
+    if (input.area_name) form.append('area_name', input.area_name);
+
+    const res = await fetch('/api/scan', { method: 'POST', body: form });
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? `Scan failed (${res.status})`);
+    return ok(json as ScanResult);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error — check your connection');
+  }
+}
+
+// ─── POST /api/report ─────────────────────────────────────────────────────────
+
+export async function postReport(
+  scanId: string,
+  notes?: string
+): Promise<ApiResult<ReportResult>> {
+  try {
+    const res = await fetch('/api/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scan_id: scanId, notes: notes ?? null }),
+    });
+    const json = await res.json();
+    // 409 = already reported — treat as success for the UI
+    if (res.status === 409) return ok(json as ReportResult);
+    if (!res.ok) return err(json.error ?? `Report failed (${res.status})`);
+    return ok(json as ReportResult);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error');
+  }
+}
+
+// ─── GET /api/dashboard/stats ─────────────────────────────────────────────────
+
+export async function getDashboardStats(
+  brandId: string,
+  from?: string,
+  to?: string
+): Promise<ApiResult<DashboardStats>> {
+  try {
+    const params = new URLSearchParams({ brand_id: brandId });
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const res = await fetch(`/api/dashboard/stats?${params}`);
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? 'Failed to load stats');
+    return ok(json as DashboardStats);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error');
+  }
+}
+
+// ─── GET /api/dashboard/heatmap ──────────────────────────────────────────────
+
+export async function getDashboardHeatmap(
+  brandId: string
+): Promise<ApiResult<HeatmapCluster[]>> {
+  try {
+    const res = await fetch(`/api/dashboard/heatmap?brand_id=${brandId}`);
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? 'Failed to load heatmap');
+    return ok(json as HeatmapCluster[]);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error');
+  }
+}
+
+// ─── GET /api/scans (scan history) ───────────────────────────────────────────
+
+export async function getScanHistory(limit = 20): Promise<ApiResult<ScanHistoryItem[]>> {
+  try {
+    const res = await fetch(`/api/scans?limit=${limit}`);
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? 'Failed to load scan history');
+    return ok(json as ScanHistoryItem[]);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error');
+  }
+}
+
+// ─── sessionStorage helpers ───────────────────────────────────────────────────
+
+const SCAN_KEY = 'shelfwatch_scan_result';
+
+export function storeScanResult(result: ScanResult): void {
+  try {
+    sessionStorage.setItem(SCAN_KEY, JSON.stringify(result));
+  } catch {
+    /* ignore QuotaExceededError */
+  }
+}
+
+export function readScanResult(): ScanResult | null {
+  try {
+    const raw = sessionStorage.getItem(SCAN_KEY);
+    return raw ? (JSON.parse(raw) as ScanResult) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Geolocation helper ───────────────────────────────────────────────────────
+
+export async function getGeolocation(): Promise<{
+  latitude: number;
+  longitude: number;
+} | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 3000, maximumAge: 60000 }
+    );
+  });
+}
+
+// ─── Format helpers ───────────────────────────────────────────────────────────
+
+export function formatConfidence(confidence: number): string {
+  return `${Math.round(confidence * 100)}%`;
+}
+
+export function formatPKR(amount: number): string {
+  if (amount >= 1_000_000) return `PKR ${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `PKR ${(amount / 1_000).toFixed(0)}K`;
+  return `PKR ${Math.round(amount).toLocaleString()}`;
+}
+
+export function verdictColor(verdict: VerdictType): string {
+  switch (verdict) {
+    case 'genuine': return 'var(--color-primary)';
+    case 'suspicious': return 'var(--color-secondary)';
+    case 'unverified': return 'var(--color-on-surface-variant)';
+  }
+}
+
+export function verdictIcon(verdict: VerdictType): string {
+  switch (verdict) {
+    case 'genuine': return 'verified';
+    case 'suspicious': return 'warning';
+    case 'unverified': return 'help_outline';
+  }
+}
