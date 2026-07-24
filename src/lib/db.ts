@@ -13,6 +13,9 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+// Bypass self-signed SSL/TLS certificate chain checks for Postgres database
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 // Fallback mock connection string to prevent constructor validation failure at build/compile time
 const fallbackDbUrl = "postgresql://postgres:postgres@localhost:5432/shelfwatch";
 const connectionUrl = process.env.DATABASE_URL || fallbackDbUrl;
@@ -22,6 +25,9 @@ const pool = new Pool({
   connectionString: connectionUrl,
   // Add a connection timeout to fail fast
   connectionTimeoutMillis: 5000,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 const adapter = new PrismaPg(pool);

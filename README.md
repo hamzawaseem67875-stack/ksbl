@@ -2,6 +2,27 @@
 
 Pakistan's first crowdsourced, AI-powered platform for verifying FMCG product authenticity — built on Next.js 16, Prisma 7, and Vercel serverless functions.
 
+---
+
+### 🚀 Key Integrations & Recent Updates (Hackathon Demo Build)
+
+1. **Passwordless Database Connectivity (Supabase REST API)**:
+   * Replaced Prisma Client direct TCP connections in all route handlers with direct HTTPS queries to **Supabase Postgrest REST API**.
+   * Completely eliminates Postgres TLS / PgBouncer / Supavisor connection errors and works out of the box with anonymous keys without needing database passwords.
+2. **Gemini 3.1 Flash Lite Migration**:
+   * Switched LLM vision engines to `gemini-3.1-flash-lite` to resolve rate limits (`429 Quota Exceeded`) on the free tier.
+   * Full multi-modal support for logo analysis, packaging layout checks, and brand spellchecking.
+3. **Keyless Product Lookup APIs**:
+   * Integrated supplement lookups via **Open Food Facts API** and **UPCitemdb API (Free Trial)** inside the verification pipeline.
+4. **Enhanced Scan History & Metadata Persistence**:
+   * Added `product_name` and `brand_name` cached columns on the `Scan` table, enabling fallback product naming on the **History page** for external lookup items.
+5. **Score-Based Verdict Rules**:
+   * Added threshold rules for database writes: Score > 70 sets verdict to `genuine`, Score < 40 sets verdict to `suspicious`, otherwise `unverified`.
+6. **Mobile Camera Capture**:
+   * Added `capture="environment"` to the hidden file input, enabling native mobile camera capture directly when clicking the scan viewfinder.
+
+---
+
 ## Quick Start (Development)
 
 ```bash

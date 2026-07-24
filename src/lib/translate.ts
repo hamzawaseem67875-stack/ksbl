@@ -4,21 +4,19 @@
  * Fixed-glossary verdict phrasing in Urdu and English.
  *
  * Strategy: the verdict enum (genuine | suspicious | unverified) maps
- * to a pre-approved bilingual phrase pair. Claude is optionally called
+ * to a pre-approved bilingual phrase pair. Gemini is optionally called
  * to generate a one-sentence contextual reason — but the verdict text
  * itself is NEVER free-translated; it comes from the lookup table only.
  * This prevents hallucinated or offensive Urdu output.
  *
  * Required env vars (optional — fallback works without any):
- *   ANTHROPIC_API_KEY — Claude API key for reason generation
+ *   GEMINI_API_KEY — Google Gemini API key for reason generation
  *
- * Swap this file to use Gemini or another provider by updating
- * callClaude() below without touching route logic.
+ * Direct REST API fetch call is used to call Gemini (model: gemini-2.5-flash)
+ * to keep the bundle lean and serverless-native.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-
-// ─── Fixed glossary ───────────────────────────────────────────────────────────
+// ─── Shared types ─────────────────────────────────────────────────────────────
 
 export type VerdictKey = "genuine" | "suspicious" | "unverified";
 
@@ -45,9 +43,9 @@ const GLOSSARY: Record<VerdictKey, { urdu: string; english: string }> = {
   },
 };
 
-// ─── Claude reason generation ────────────────────────────────────────────────
+// ─── Gemini reason generation ────────────────────────────────────────────────
 
-async function callClaude(
+async function callGemini(
   verdict: VerdictKey,
   context: {
     batch?: string | null;
@@ -55,12 +53,10 @@ async function callClaude(
     brand_name?: string | null;
   }
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return getDefaultReason(verdict, context);
 
   try {
-    const client = new Anthropic({ apiKey });
-
     const prompt = `You are a product authenticity assistant for ShelfWatch, an anti-counterfeit system for Pakistan's FMCG market.
 
 A product scan returned verdict: "${verdict}"
@@ -70,17 +66,48 @@ Brand: ${context.brand_name ?? "Unknown"}
 
 Write ONE concise sentence (max 20 words) in English explaining the reason for this verdict. Be factual, not alarming. No Urdu.`;
 
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 80,
-      messages: [{ role: "user", content: prompt }],
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+
+    // 4-second timeout controller for API fetch call
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
     });
 
-    const content = message.content[0];
-    if (content.type === "text") return content.text.trim();
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.warn(`[Translate] Gemini returned status ${response.status}`);
+      return getDefaultReason(verdict, context);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (text) {
+      return text.trim();
+    }
+    
     return getDefaultReason(verdict, context);
   } catch (err) {
-    console.error("[Translate] Claude call failed:", err);
+    console.error("[Translate] Gemini call failed or timed out:", err);
     return getDefaultReason(verdict, context);
   }
 }
@@ -118,7 +145,7 @@ export async function getVerdictText(
   } = {}
 ): Promise<VerdictText> {
   const phrase = GLOSSARY[verdict];
-  const reason = await callClaude(verdict, context);
+  const reason = await callGemini(verdict, context);
 
   return {
     urdu_text: phrase.urdu,
@@ -128,7 +155,7 @@ export async function getVerdictText(
 }
 
 /**
- * Synchronous fallback — returns glossary text without Claude.
+ * Synchronous fallback — returns glossary text without Gemini.
  * Use when you need an instant response and can't await.
  */
 export function getVerdictTextSync(verdict: VerdictKey): Omit<VerdictText, "reason"> {

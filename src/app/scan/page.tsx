@@ -25,55 +25,40 @@ export default function ScanPage() {
     loadHistory();
   }, []);
 
-  // Build FormData and POST to /api/scan via postScan API helper
+  // Convert captured file to base64 and save to sessionStorage, then navigate to /scan/processing
   const submitScan = async (imageFile: File | null, barcodeVal: string) => {
     setScanning(true);
     setError(null);
 
     try {
-      let fileToUpload = imageFile;
-      
-      // If no image file, create a 1×1 transparent pixel as placeholder
-      if (!fileToUpload) {
-        const r = await fetch('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-        const placeholder = await r.blob();
-        fileToUpload = new File([placeholder], 'placeholder.gif', { type: 'image/gif' });
-      }
-
-      // Request geolocation if browser supports it
-      const geo = await getGeolocation();
-
-      const res = await postScan({
-        imageFile: fileToUpload,
-        barcode: barcodeVal || undefined,
-        role: 'consumer',
-        latitude: geo?.latitude,
-        longitude: geo?.longitude,
-        area_name: 'Karachi Area', // Fallback area name for hackathon demo location mapping
-      });
-
-      if (res.error) {
-        throw new Error(res.error);
-      }
-
-      if (res.data) {
-        // Store result in sessionStorage for result pages
-        storeScanResult(res.data);
-
-        // Navigate to the appropriate result page based on verdict
-        if (res.data.verdict === 'genuine') {
-          router.push('/scan/genuine');
-        } else if (res.data.verdict === 'suspicious') {
-          router.push('/scan/result');
-        } else {
-          router.push('/scan/unverified');
-        }
+      if (imageFile) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          try {
+            const base64Data = reader.result as string;
+            sessionStorage.setItem('shelfwatch_captured_image', base64Data);
+            sessionStorage.setItem('shelfwatch_captured_barcode', barcodeVal || '');
+            router.push('/scan/processing');
+          } catch (storageErr) {
+            console.error('Failed to store base64 image in sessionStorage:', storageErr);
+            setError('Image is too large. Please capture/upload a smaller photo.');
+            setScanning(false);
+          }
+        };
+        reader.onerror = () => {
+          setError('Failed to read image file.');
+          setScanning(false);
+        };
+        reader.readAsDataURL(imageFile);
       } else {
-        throw new Error('No scan result returned from verification server.');
+        // Barcode only lookup
+        sessionStorage.removeItem('shelfwatch_captured_image');
+        sessionStorage.setItem('shelfwatch_captured_barcode', barcodeVal || '');
+        router.push('/scan/processing');
       }
     } catch (err) {
-      console.error('[ScanPage] Scan failed:', err);
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      console.error('[ScanPage] Prep failed:', err);
+      setError('Something went wrong. Please try again.');
       setScanning(false);
     }
   };

@@ -15,7 +15,7 @@
  *  7. Return full verdict payload
  */
 
-import { put } from "@vercel/blob";
+import { uploadImage } from "./blob";
 import { db } from "./db";
 import { runOcr } from "./ocr";
 import { scorePackaging } from "./cv";
@@ -72,6 +72,78 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 // ─── Product lookup ───────────────────────────────────────────────────────────
+
+/**
+ * Open Food Facts is a community-maintained, mostly food/grocery-focused database,
+ * so coverage for non-food FMCG items (soaps, detergents, cosmetics) may be limited.
+ * It should be treated as a "nice to have" enrichment source, not the primary source of truth.
+ */
+async function fetchOpenFoodFacts(barcode: string): Promise<{ product_name: string | null; brand_name: string | null } | null> {
+  const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5 seconds timeout
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "ShelfWatch - FMCG Authenticity Verification Pipeline - Version 1.0",
+      },
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.status === 1 && data.product) {
+      return {
+        product_name: data.product.product_name || data.product.product_name_en || null,
+        brand_name: data.product.brands || null,
+      };
+    }
+  } catch (err) {
+    console.warn("[Open Food Facts API Lookup] Failed or timed out:", err);
+  }
+  return null;
+}
+
+/**
+ * UPCitemdb is queried using the free trial plan, which does not require an API key
+ * but has a rate limit of 100 requests/day per IP.
+ */
+async function fetchUPCItemDB(barcode: string): Promise<{ product_name: string | null; brand_name: string | null } | null> {
+  const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5 seconds timeout
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/json",
+      },
+    });
+    clearTimeout(timeoutId);
+
+    if (res.status === 429) {
+      console.warn("[UPCitemdb API Lookup] Rate limit reached (100 requests/day/IP exceeded).");
+      return null;
+    }
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.code === "OK" && data.total > 0 && data.items && data.items.length > 0) {
+      const item = data.items[0];
+      return {
+        product_name: item.title || null,
+        brand_name: item.brand || null,
+      };
+    }
+  } catch (err) {
+    console.warn("[UPCitemdb API Lookup] Failed or timed out:", err);
+  }
+  return null;
+}
 
 async function findProduct(barcode?: string | null, batch?: string | null) {
   // 1. Exact SKU match (barcode scan)
@@ -144,11 +216,7 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
   let imageUrl: string;
 
   try {
-    const blob = await put(filename, input.imageFile, {
-      access: "public",
-      contentType: "image/jpeg",
-    });
-    imageUrl = blob.url;
+    imageUrl = await uploadImage(filename, input.imageFile);
   } catch (err) {
     console.error("[verifyProduct] Blob upload failed:", err);
     // Use a placeholder URL so the scan row still gets written
@@ -186,6 +254,15 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
   // ── Step 3: Product lookup ────────────────────────────────────────────────
   const product = await findProduct(input.barcode, ocrBatch);
 
+  // Fallback metadata lookup from Open Food Facts / UPCitemdb if local DB has no record
+  let offProduct: { product_name: string | null; brand_name: string | null } | null = null;
+  if (!product && input.barcode) {
+    offProduct = await fetchOpenFoodFacts(input.barcode);
+    if (!offProduct) {
+      offProduct = await fetchUPCItemDB(input.barcode);
+    }
+  }
+
   // ── Step 4: Verdict ───────────────────────────────────────────────────────
   const { verdict, confidence } = computeVerdict(product, ocrBatch, cvScore ?? 0.5);
 
@@ -193,7 +270,7 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
   const verdictText = await getVerdictText(verdict, {
     batch: ocrBatch,
     anomaly_score: cvScore,
-    brand_name: product?.brand_name,
+    brand_name: product?.brand_name ?? offProduct?.brand_name ?? undefined,
   });
 
   // ── Step 6: Write Scan row ────────────────────────────────────────────────
@@ -246,7 +323,7 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
     extracted_mfg_date: ocrMfgDate,
     extracted_mrp: ocrMrp,
     cv_anomaly_score: cvScore,
-    product_name: product?.product_name ?? null,
-    brand_name: product?.brand_name ?? null,
+    product_name: product?.product_name ?? offProduct?.product_name ?? null,
+    brand_name: product?.brand_name ?? offProduct?.brand_name ?? null,
   };
 }

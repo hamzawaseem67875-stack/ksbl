@@ -68,6 +68,8 @@ model Product {
 model Scan {
   id               String        @id @default(cuid())
   product_id       String?       // nullable — no match found = unverified
+  product_name     String?       // Cache product name for fallback lookups (UPCItemDB/OpenFoodFacts)
+  brand_name       String?       // Cache brand name for fallback lookups (UPCItemDB/OpenFoodFacts)
   scanned_by_role  ScannedByRole @default(consumer)
   image_url        String
   extracted_batch  String?
