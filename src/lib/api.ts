@@ -230,7 +230,7 @@ export function formatConfidence(confidence: number): string {
 
 export function formatPKR(amount: number): string {
   if (amount >= 1_000_000) return `PKR ${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `PKR ${(amount / 1_000).toFixed(0)}K`;
+  if (amount >= 100_000) return `PKR ${(amount / 1_000).toFixed(0)}K`;
   return `PKR ${Math.round(amount).toLocaleString()}`;
 }
 

@@ -88,13 +88,72 @@ const formatColors: Record<ReportFormat, string> = {
 export default function ReportsPage() {
   const [downloading, setDownloading] = useState<number | null>(null);
   const [downloaded, setDownloaded] = useState<Set<number>>(new Set());
+  const [generating, setGenerating] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  function handleDownload(id: number) {
+  async function handleDownload(id: number, format: string, name: string) {
     setDownloading(id);
-    setTimeout(() => {
-      setDownloading(null);
+    setToast(null);
+    console.log(`[Reports] Downloading report #${id}: ${name}`);
+
+    try {
+      const res = await fetch(`/api/reports/download?id=${id}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch report from server (status: ${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name.replace(/\s+/g, "_")}.${format.toLowerCase()}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
       setDownloaded(prev => new Set(prev).add(id));
-    }, 1800);
+      console.log(`[Reports] Downloaded report #${id} successfully`);
+      setToast({ message: `Successfully downloaded "${name}"`, type: 'success' });
+    } catch (err) {
+      console.error(`[Reports] Download failed for #${id}:`, err);
+      setToast({ message: `Download failed: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    setToast(null);
+    console.log("[Reports] Triggering report compile generation...");
+
+    try {
+      const res = await fetch('/api/reports/generate', {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to compile report from database (status: ${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Supply_Chain_Audit_Report_${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      console.log("[Reports] Supply Chain Audit Report generated successfully");
+      setToast({ message: 'Global Supply Chain Audit Report compiled and downloaded successfully!', type: 'success' });
+    } catch (err) {
+      console.error("[Reports] Supply Chain Audit Report generation failed:", err);
+      setToast({ message: `Generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
+    } finally {
+      setGenerating(false);
+    }
   }
 
   return (
@@ -104,9 +163,15 @@ export default function ReportsPage() {
           <h1 className={styles.title}>Reports</h1>
           <p className={styles.subtitle}>Download generated intelligence reports and audit exports</p>
         </div>
-        <button className={styles.generateBtn}>
-          <span className="material-symbols-outlined">add_chart</span>
-          Generate Report
+        <button
+          className={styles.generateBtn}
+          onClick={handleGenerate}
+          disabled={generating}
+        >
+          <span className={`material-symbols-outlined ${generating ? styles.spin : ''}`}>
+            {generating ? 'sync' : 'add_chart'}
+          </span>
+          {generating ? 'Generating…' : 'Generate Report'}
         </button>
       </div>
 
@@ -156,7 +221,7 @@ export default function ReportsPage() {
               </span>
               <button
                 className={`${styles.downloadBtn} ${downloaded.has(report.id) ? styles.downloadDone : ''}`}
-                onClick={() => !downloaded.has(report.id) && handleDownload(report.id)}
+                onClick={() => !downloaded.has(report.id) && handleDownload(report.id, report.format, report.name)}
                 disabled={downloading === report.id}
               >
                 {downloading === report.id ? (
@@ -172,6 +237,35 @@ export default function ReportsPage() {
           </div>
         ))}
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: toast.type === 'success' ? '#1c2e24' : '#331a1a',
+          color: 'white',
+          border: toast.type === 'success' ? '1px solid #46f1c5' : '1px solid #ff6b6b',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '14px',
+          fontFamily: 'var(--font-inter), sans-serif'
+        }}>
+          <span className="material-symbols-outlined" style={{ color: toast.type === 'success' ? '#46f1c5' : '#ff6b6b', fontSize: '18px' }}>
+            {toast.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          {toast.message}
+          <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', marginLeft: '12px', display: 'flex', alignItems: 'center' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

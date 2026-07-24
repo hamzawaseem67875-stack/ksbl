@@ -20,6 +20,48 @@ import { runComparisonEngine } from "@/services/comparisonEngine";
 import { calculateAuthenticityScore } from "@/services/scoreEngine";
 import { getCachedProduct, setCachedProduct, UnifiedProduct } from "@/services/cacheService";
 import { uploadImage } from "@/lib/blob";
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "ShelfWatch/1.0 (contact: support@shelfwatch.local)"
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.address) {
+        const addr = data.address;
+        const area = addr.neighbourhood || addr.suburb || addr.city_district || addr.road || addr.county || addr.city || "Unknown Location";
+        return area;
+      }
+    }
+  } catch (err) {
+    console.error("[VerifyAPI] Reverse geocoding error:", err);
+  }
+
+  // Fallback boundary match for Karachi coordinates
+  const KARACHI_AREAS = [
+    { name: "Korangi Industrial Area", lat: 24.8338, lng: 67.1035 },
+    { name: "Liaquatabad", lat: 24.9158, lng: 67.0431 },
+    { name: "SITE Area", lat: 24.9087, lng: 66.9989 },
+    { name: "Orangi Town", lat: 24.9495, lng: 67.0142 },
+    { name: "Clifton", lat: 24.8138, lng: 67.0336 },
+    { name: "Gulshan-e-Iqbal", lat: 24.9180, lng: 67.0970 },
+    { name: "Saddar", lat: 24.8608, lng: 67.0104 }
+  ];
+
+  let bestArea = KARACHI_AREAS[0].name;
+  let minDist = Infinity;
+  for (const a of KARACHI_AREAS) {
+    const dist = Math.hypot(a.lat - lat, a.lng - lng);
+    if (dist < minDist) {
+      minDist = dist;
+      bestArea = a.name;
+    }
+  }
+  return bestArea;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -170,6 +212,23 @@ export async function POST(req: NextRequest) {
       dbVerdict = "unverified";
     }
 
+    const KARACHI_AREAS = [
+      { name: "Korangi Industrial Area", lat: 24.8338, lng: 67.1035 },
+      { name: "Liaquatabad", lat: 24.9158, lng: 67.0431 },
+      { name: "SITE Area", lat: 24.9087, lng: 66.9989 },
+      { name: "Orangi Town", lat: 24.9495, lng: 67.0142 },
+      { name: "Clifton", lat: 24.8138, lng: 67.0336 },
+      { name: "Gulshan-e-Iqbal", lat: 24.9180, lng: 67.0970 },
+      { name: "Saddar", lat: 24.8608, lng: 67.0104 }
+    ];
+    const randomArea = KARACHI_AREAS[Math.floor(Math.random() * KARACHI_AREAS.length)];
+    const scanLat = formData.get("latitude") ? parseFloat(formData.get("latitude") as string) : randomArea.lat;
+    const scanLng = formData.get("longitude") ? parseFloat(formData.get("longitude") as string) : randomArea.lng;
+    let scanArea = formData.get("area_name") as string | null;
+    if (!scanArea) {
+      scanArea = await reverseGeocode(scanLat, scanLng);
+    }
+
     let scanId = "scan-" + Date.now();
     if (supabaseUrl && anonKey) {
       try {
@@ -194,9 +253,9 @@ export async function POST(req: NextRequest) {
             cv_anomaly_score: (100 - gemini.packagingMatch) / 100,
             verdict: dbVerdict,
             confidence: finalScore / 100,
-            latitude: formData.get("latitude") ? parseFloat(formData.get("latitude") as string) : null,
-            longitude: formData.get("longitude") ? parseFloat(formData.get("longitude") as string) : null,
-            area_name: (formData.get("area_name") as string) || "Karachi Area",
+            latitude: scanLat,
+            longitude: scanLng,
+            area_name: scanArea,
           })
         });
         if (scanRes.ok) {

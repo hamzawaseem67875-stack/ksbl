@@ -38,6 +38,12 @@ enum SubscriptionTier {
   enterprise
 }
 
+enum ProductStatus {
+  active
+  flagged
+  recalled
+}
+
 // ─────────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────────
@@ -53,14 +59,15 @@ model Brand {
 }
 
 model Product {
-  id                      String   @id @default(cuid())
-  sku                     String   @unique
+  id                      String        @id @default(cuid())
+  sku                     String        @unique
   brand_name              String
   product_name            String
-  reference_batch_pattern String   // regex or prefix, e.g. "^XP-[0-9]{3}-KHI"
+  reference_batch_pattern String        // regex or prefix, e.g. "^XP-[0-9]{3}-KHI"
   reference_image_url     String?
-  avg_unit_price_pkr      Float    @default(0) // used for estimated_losses calculation
-  created_at              DateTime @default(now())
+  avg_unit_price_pkr      Float         @default(0) // used for estimated_losses calculation
+  status                  ProductStatus @default(active)
+  created_at              DateTime      @default(now())
 
   scans Scan[]
 }

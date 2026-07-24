@@ -13,8 +13,37 @@ const navItems = [
   { href: '/settings', icon: 'settings', label: 'SETTINGS' },
 ];
 
+import { useState } from 'react';
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportAll = async () => {
+    if (exporting) return;
+    setExporting(true);
+    console.log("[Sidebar] Exporting all scan logs...");
+    try {
+      const res = await fetch("/api/scans/export");
+      if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ShelfWatch_All_Scans_Export_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      alert("Successfully exported all scans to CSV!");
+    } catch (err) {
+      console.error("[Sidebar] Failed to export all scans:", err);
+      alert("Failed to export scan logs. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <aside className={styles.sidebar}>
@@ -47,9 +76,15 @@ export default function Sidebar() {
       </div>
 
       <div className={styles.sidebarFooter}>
-        <button className={styles.exportBtn}>
-          <span className="material-symbols-outlined">download</span>
-          EXPORT DATA
+        <button 
+          className={styles.exportBtn}
+          onClick={handleExportAll}
+          disabled={exporting}
+        >
+          <span className={`material-symbols-outlined ${exporting ? 'spin' : ''}`}>
+            {exporting ? 'sync' : 'download'}
+          </span>
+          {exporting ? 'EXPORTING...' : 'EXPORT DATA'}
         </button>
         <Link href="/scan" className={styles.scanBtn}>
           <span className="material-symbols-outlined">qr_code_scanner</span>

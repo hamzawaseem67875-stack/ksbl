@@ -1,46 +1,152 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import VerdictBadge from '@/components/VerdictBadge';
 import styles from './inventory.module.css';
 
 type FilterType = 'All' | 'Active' | 'Flagged' | 'Recalled';
-type Verdict = 'genuine' | 'suspicious' | 'counterfeit' | 'unverified' | 'processing';
-
-const PRODUCTS = [
-  { id: 1, name: 'HealthCare Pro 500mg', brand: 'MedShield Pharma', stock: 12400, verdict: 'genuine' as Verdict, color: '#46f1c520', accent: '#46f1c5' },
-  { id: 2, name: 'VitaBoost Capsules', brand: 'NutraLabs', stock: 8320, verdict: 'genuine' as Verdict, color: '#46f1c520', accent: '#46f1c5' },
-  { id: 3, name: 'GlucoTest Pro Strips', brand: 'DiagnoCare', stock: 340, verdict: 'counterfeit' as Verdict, color: '#ffb4ab20', accent: '#ffb4ab' },
-  { id: 4, name: 'PharmaShield Tablets', brand: 'PharmaShield Co.', stock: 2100, verdict: 'suspicious' as Verdict, color: '#ffb95f20', accent: '#ffb95f' },
-  { id: 5, name: 'SkinCare Elite Cream', brand: 'DermaElite', stock: 5560, verdict: 'genuine' as Verdict, color: '#46f1c520', accent: '#46f1c5' },
-  { id: 6, name: 'OmegaMax Fish Oil', brand: 'VitaOcean', stock: 0, verdict: 'unverified' as Verdict, color: '#bacac230', accent: '#bacac2' },
-  { id: 7, name: 'ImmunePlus Syrup', brand: 'BioHealth', stock: 780, verdict: 'counterfeit' as Verdict, color: '#ffb4ab20', accent: '#ffb4ab' },
-  { id: 8, name: 'CalciumD3 Chewable', brand: 'BoneCare Labs', stock: 4200, verdict: 'processing' as Verdict, color: '#46f1c510', accent: '#46f1c5' },
-];
 
 const FILTERS: FilterType[] = ['All', 'Active', 'Flagged', 'Recalled'];
-
 const PAGE_SIZE = 6;
 
-function filterProducts(products: typeof PRODUCTS, filter: FilterType, search: string) {
+function filterProducts(products: any[], filter: FilterType, search: string) {
   let result = products;
-  if (filter === 'Active') result = result.filter(p => p.verdict === 'genuine');
-  if (filter === 'Flagged') result = result.filter(p => p.verdict === 'suspicious' || p.verdict === 'counterfeit');
-  if (filter === 'Recalled') result = result.filter(p => p.stock === 0);
-  if (search) result = result.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.brand.toLowerCase().includes(search.toLowerCase())
-  );
+  if (filter === 'Active') result = result.filter(p => p.status === 'active');
+  if (filter === 'Flagged') result = result.filter(p => p.status === 'flagged');
+  if (filter === 'Recalled') result = result.filter(p => p.status === 'recalled');
+  
+  if (search) {
+    const q = search.toLowerCase();
+    result = result.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.brand.toLowerCase().includes(q) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q))
+    );
+  }
   return result;
 }
 
 export default function InventoryPage() {
+  const [products, setProducts] = useState<any[]>([]);
   const [filter, setFilter] = useState<FilterType>('All');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = filterProducts(PRODUCTS, filter, search);
+  // Form states
+  const [newName, setNewName] = useState('');
+  const [newBrand, setNewBrand] = useState('');
+  const [newBarcode, setNewBarcode] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function loadProducts() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/products");
+      if (!res.ok) throw new Error("Failed to load inventory from server");
+      const data = await res.json();
+      setProducts(data);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  async function handleStatusChange(productId: string, newStatus: 'active' | 'flagged' | 'recalled') {
+    try {
+      const res = await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, status: newStatus })
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      
+      // Optimistic UI update
+      setProducts(prev => prev.map(p => {
+        if (p.id === productId) {
+          let displayVerdict = "genuine";
+          if (newStatus === "flagged") displayVerdict = "suspicious";
+          else if (newStatus === "recalled") displayVerdict = "counterfeit";
+          else if (p.stock === 0) displayVerdict = "unverified";
+
+          let color = "rgba(70,241,197,0.1)";
+          let accent = "#46f1c5";
+          if (displayVerdict === "suspicious") {
+            color = "rgba(255,185,95,0.1)";
+            accent = "#ffb95f";
+          } else if (displayVerdict === "counterfeit") {
+            color = "rgba(255,107,107,0.1)";
+            accent = "#ff6b6b";
+          } else if (displayVerdict === "unverified") {
+            color = "rgba(255,255,255,0.05)";
+            accent = "#bacac2";
+          }
+
+          return { ...p, status: newStatus, verdict: displayVerdict, color, accent };
+        }
+        return p;
+      }));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update product status. Please try again.");
+    }
+  }
+
+  async function handleAddProduct(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    if (!newName.trim() || !newBrand.trim() || !newBarcode.trim()) {
+      setFormError("Product Name, Brand, and Barcode are all required.");
+      return;
+    }
+
+    if (!/^[0-9]+$/.test(newBarcode.trim())) {
+      setFormError("Barcode must consist of digits only (EAN/UPC format).");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName,
+          brand: newBrand,
+          barcode: newBarcode,
+          reference_image: newImageUrl || null
+        })
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to add product");
+
+      setNewName('');
+      setNewBrand('');
+      setNewBarcode('');
+      setNewImageUrl('');
+      setShowAdd(false);
+      loadProducts();
+    } catch (err) {
+      console.error(err);
+      setFormError(err instanceof Error ? err.message : "Failed to add product");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const filtered = filterProducts(products, filter, search);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -50,7 +156,7 @@ export default function InventoryPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Inventory Management</h1>
-          <p className={styles.subtitle}>{PRODUCTS.length} products tracked across all regions</p>
+          <p className={styles.subtitle}>{filtered.length} products tracked across all regions</p>
         </div>
         <button className={styles.addBtn} onClick={() => setShowAdd(true)}>
           <span className="material-symbols-outlined">add</span>
@@ -64,7 +170,7 @@ export default function InventoryPage() {
           <span className={`material-symbols-outlined ${styles.searchIcon}`}>search</span>
           <input
             className={styles.searchInput}
-            placeholder="Search products, brands…"
+            placeholder="Search products, brands, barcodes…"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
           />
@@ -88,7 +194,18 @@ export default function InventoryPage() {
       </div>
 
       {/* Product Grid */}
-      {paginated.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
+          <span className="material-symbols-outlined spin" style={{ fontSize: '32px' }}>sync</span>
+          <p style={{ marginTop: '8px' }}>Loading inventory items...</p>
+        </div>
+      ) : error ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-error)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>error</span>
+          <p style={{ marginTop: '8px' }}>{error}</p>
+          <button className={styles.addBtn} style={{ marginTop: '12px', background: 'rgba(255,255,255,0.08)' }} onClick={loadProducts}>Retry</button>
+        </div>
+      ) : paginated.length === 0 ? (
         <div className={styles.empty}>
           <span className="material-symbols-outlined" style={{ fontSize: '48px', opacity: 0.3 }}>inventory_2</span>
           <p>No products found</p>
@@ -99,22 +216,45 @@ export default function InventoryPage() {
             <div key={p.id} className={styles.card}>
               <div className={styles.cardImage} style={{ background: p.color, borderColor: p.accent + '40' }}>
                 <span className="material-symbols-outlined" style={{ color: p.accent, fontSize: '36px' }}>
-                  medication
+                  {p.status === 'recalled' ? 'cancel' : 'medication'}
                 </span>
               </div>
               <div className={styles.cardBody}>
                 <div className={styles.cardTop}>
                   <h3 className={styles.productName}>{p.name}</h3>
                   <span className={styles.brandTag}>{p.brand}</span>
+                  <p style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)', marginTop: '4px', fontFamily: 'monospace' }}>
+                    SKU: {p.barcode}
+                  </p>
                 </div>
                 <div className={styles.cardFooter}>
                   <div className={styles.stockInfo}>
-                    <span className={styles.stockLabel}>Stock</span>
-                    <span className={styles.stockValue} style={{ color: p.stock === 0 ? 'var(--color-error)' : 'var(--color-on-surface)' }}>
-                      {p.stock === 0 ? 'Out of Stock' : p.stock.toLocaleString()}
+                    <span className={styles.stockLabel}>Scans Count</span>
+                    <span className={styles.stockValue}>
+                      {p.stock.toLocaleString()}
                     </span>
                   </div>
-                  <VerdictBadge verdict={p.verdict} size="sm" />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                    <VerdictBadge verdict={p.verdict} size="sm" />
+                    <select
+                      value={p.status}
+                      onChange={(e) => handleStatusChange(p.id, e.target.value as any)}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.8)',
+                        padding: '3px 6px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="active" style={{ background: '#1c1b1f', color: 'white' }}>Active</option>
+                      <option value="flagged" style={{ background: '#1c1b1f', color: 'white' }}>Flagged</option>
+                      <option value="recalled" style={{ background: '#1c1b1f', color: 'white' }}>Recalled</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -157,24 +297,64 @@ export default function InventoryPage() {
       {showAdd && (
         <div className={styles.modalOverlay} onClick={() => setShowAdd(false)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Add New Product</h2>
-              <button className={styles.modalClose} onClick={() => setShowAdd(false)}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <div className={styles.modalBody}>
-              {['Product Name', 'Brand', 'Batch Number', 'Stock Count'].map(field => (
-                <div key={field} className={styles.formGroup}>
-                  <label className={styles.formLabel}>{field}</label>
-                  <input className={styles.formInput} placeholder={`Enter ${field.toLowerCase()}…`} />
+            <form onSubmit={handleAddProduct}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Add Reference Product</h2>
+                <button type="button" className={styles.modalClose} onClick={() => setShowAdd(false)}>
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className={styles.modalBody}>
+                {formError && (
+                  <p style={{ color: 'var(--color-error)', fontSize: '13px', marginBottom: '16px' }}>{formError}</p>
+                )}
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Product Name *</label>
+                  <input
+                    required
+                    className={styles.formInput}
+                    placeholder="Enter product name (e.g. Lifebuoy Soap)..."
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                  />
                 </div>
-              ))}
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.btnOutlined} onClick={() => setShowAdd(false)}>Cancel</button>
-              <button className={styles.btnPrimary} onClick={() => setShowAdd(false)}>Save Product</button>
-            </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Brand *</label>
+                  <input
+                    required
+                    className={styles.formInput}
+                    placeholder="Enter brand owner (e.g. Unilever Pakistan)..."
+                    value={newBrand}
+                    onChange={e => setNewBrand(e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Barcode / SKU *</label>
+                  <input
+                    required
+                    className={styles.formInput}
+                    placeholder="Enter unique digits barcode..."
+                    value={newBarcode}
+                    onChange={e => setNewBarcode(e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Reference Image URL (Optional)</label>
+                  <input
+                    className={styles.formInput}
+                    placeholder="Enter reference image public URL..."
+                    value={newImageUrl}
+                    onChange={e => setNewImageUrl(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className={styles.modalFooter}>
+                <button type="button" className={styles.btnOutlined} onClick={() => setShowAdd(false)}>Cancel</button>
+                <button type="submit" className={styles.btnPrimary} disabled={submitting}>
+                  {submitting ? 'Registering...' : 'Register Product'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

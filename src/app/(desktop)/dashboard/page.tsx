@@ -11,18 +11,35 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [flagged, setFlagged] = useState(false);
 
+  const [exporting, setExporting] = useState(false);
+  const [flagging, setFlagging] = useState(false);
+
   useEffect(() => {
     async function loadIncident() {
       const res = await getScanHistory(10);
       setLoading(false);
       if (res.data && res.data.length > 0) {
         // Find the most recent suspicious scan to highlight as the active incident
-        const suspicious = res.data.find(s => s.verdict === 'suspicious');
-        if (suspicious) {
-          setActiveIncident(suspicious);
-        } else {
-          // Fallback to the first scan if none are suspicious
-          setActiveIncident(res.data[0]);
+        const suspicious = res.data.find(s => s.verdict === 'suspicious') || res.data[0];
+        setActiveIncident(suspicious);
+
+        // Check if this scan has already been flagged in Supabase
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (supabaseUrl && anonKey) {
+          try {
+            const repRes = await fetch(`${supabaseUrl}/rest/v1/Report?scan_id=eq.${suspicious.id}`, {
+              headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
+            });
+            if (repRes.ok) {
+              const reports = await repRes.json();
+              if (reports && reports.length > 0) {
+                setFlagged(reports[0].status === 'investigating');
+              }
+            }
+          } catch (e) {
+            console.error("[Dashboard] Error checking flagged report status:", e);
+          }
         }
       }
     }
@@ -30,10 +47,53 @@ export default function DashboardPage() {
   }, []);
 
   const handleFlagIncident = async () => {
-    if (!activeIncident) return;
-    setFlagged(true);
-    // Create additional report / flag logic
-    await postReport(activeIncident.id, 'Flagged by brand operator for manual investigation');
+    if (!activeIncident || flagged || flagging) return;
+    setFlagging(true);
+    console.log(`[Dashboard] Flagging incident: ${activeIncident.id}`);
+
+    try {
+      const res = await fetch(`/api/incidents/${activeIncident.id}/flag`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+      setFlagged(true);
+      alert(`Incident #${activeIncident.id.substring(0, 5).toUpperCase()} has been successfully flagged for manual field investigation.`);
+    } catch (err) {
+      console.error("[Dashboard] Flagging failed:", err);
+      alert("Failed to flag this incident. Please try again.");
+    } finally {
+      setFlagging(false);
+    }
+  };
+
+  const handleExportIncident = async () => {
+    if (!activeIncident || exporting) return;
+    setExporting(true);
+    console.log(`[Dashboard] Exporting dossier for incident: ${activeIncident.id}`);
+
+    try {
+      const res = await fetch(`/api/incidents/${activeIncident.id}/export`);
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Incident_Report_${activeIncident.id.substring(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[Dashboard] Export failed:", err);
+      alert("Failed to export report dossier. Please try again.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Mock flags detected based on confidence & type for the UI presentation
@@ -149,15 +209,21 @@ export default function DashboardPage() {
               <button 
                 className={styles.flagBtn} 
                 onClick={handleFlagIncident} 
-                disabled={flagged}
+                disabled={flagged || flagging}
                 style={{ opacity: flagged ? 0.6 : 1 }}
               >
-                <span className="material-symbols-outlined">{flagged ? 'done' : 'flag'}</span>
-                {flagged ? 'Flagged for Investigation' : 'Flag for Investigation'}
+                <span className={`material-symbols-outlined ${flagging ? 'spin' : ''}`}>{flagging ? 'sync' : flagged ? 'done' : 'flag'}</span>
+                {flagging ? 'Flagging...' : flagged ? 'Flagged for Investigation' : 'Flag for Investigation'}
               </button>
-              <button className={styles.exportBtnAlt}>
-                <span className="material-symbols-outlined">download</span>
-                Export Report
+              <button 
+                className={styles.exportBtnAlt}
+                onClick={handleExportIncident}
+                disabled={exporting}
+              >
+                <span className={`material-symbols-outlined ${exporting ? 'spin' : ''}`}>
+                  {exporting ? 'sync' : 'download'}
+                </span>
+                {exporting ? 'Exporting...' : 'Export Report'}
               </button>
             </div>
           </>

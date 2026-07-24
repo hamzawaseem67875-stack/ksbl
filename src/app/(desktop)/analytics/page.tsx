@@ -132,143 +132,181 @@ export default function AnalyticsPage() {
         Last refreshed: {lastRefreshed.toLocaleTimeString()}
       </p>
 
-      {/* KPI Cards */}
-      <div className={styles.kpiGrid}>
-        {[
-          { label: 'Total Scans', value: totalScans.toLocaleString(), sub: 'Scans captured', icon: 'qr_code_scanner', color: 'var(--color-primary)' },
-          { label: 'Suspicious Items', value: suspiciousCount.toLocaleString(), sub: `${stats?.suspicious_rate ?? 0}% rate`, icon: 'warning', color: 'var(--color-secondary)' },
-          { label: 'Losses Avoided', value: stats ? formatPKR(stats.estimated_losses_pkr) : 'PKR 0', sub: 'Estimated retail value', icon: 'payments', color: 'var(--color-primary)' },
-          { label: 'Unverified Products', value: unverifiedCount.toLocaleString(), sub: 'Unregistered SKU scans', icon: 'help_outline', color: 'var(--color-on-surface-variant)' },
-        ].map((kpi, i) => (
-          <div key={i} className={styles.kpiCard}>
-            <div className={styles.kpiTop}>
-              <span className={styles.kpiLabel}>{kpi.label}</span>
-              <div className={styles.kpiIcon} style={{ color: kpi.color, background: kpi.color + '15' }}>
-                <span className="material-symbols-outlined">{kpi.icon}</span>
-              </div>
-            </div>
-            <div className={styles.kpiValue} style={{ color: kpi.color }}>{kpi.value}</div>
-            <div className={styles.kpiDelta} style={{ color: 'var(--color-on-surface-variant)' }}>
-              {kpi.sub}
-            </div>
+      {/* Metrics container with loading state overlay */}
+      <div style={{ position: 'relative', minHeight: '400px' }}>
+        {loading && (
+          <div style={{
+            position: 'absolute',
+            top: '150px',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+            background: 'rgba(12, 19, 34, 0.85)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '20px 40px',
+            borderRadius: '16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(8px)',
+            color: 'var(--color-primary)'
+          }}>
+            <span className="material-symbols-outlined spin" style={{ fontSize: '36px' }}>sync</span>
+            <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.05em', color: 'white' }}>RECALCULATING METRICS...</span>
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Chart + Map/Hotspot Areas row */}
-      <div className={styles.chartRow}>
-        <div className={styles.chartCard}>
-          <h3 className={styles.cardTitle}>Hotspot Areas (Karachi)</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', overflowY: 'auto', paddingRight: '8px' }}>
-            {heatmap.map((area, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div>
-                  <p style={{ fontWeight: 600, color: 'white', fontSize: '14px' }}>{area.area_name}</p>
-                  <p style={{ fontSize: '12px', color: 'var(--color-on-surface-variant)', marginTop: '2px' }}>
-                    Lat: {area.latitude?.toFixed(4) || 'N/A'}, Lng: {area.longitude?.toFixed(4) || 'N/A'}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontWeight: 700, color: 'var(--color-secondary)', fontSize: '15px' }}>
-                    {area.report_count} Scans
-                  </p>
-                  <p style={{ fontSize: '11px', color: 'var(--color-error)', marginTop: '2px' }}>
-                    {area.suspicious_rate}% Suspicious
-                  </p>
-                </div>
-              </div>
-            ))}
-            {heatmap.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--color-on-surface-variant)', fontSize: '14px' }}>
-                No regional hotspots detected yet.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.donutCard}>
-          <h3 className={styles.cardTitle}>Result Breakdown</h3>
-          <div className={styles.donutChart}>
-            <div className={styles.donutRing}></div>
-            <div className={styles.donutCenter}>
-              <span className={styles.donutValue}>{genuinePct}%</span>
-              <span className={styles.donutSub}>Genuine</span>
-            </div>
-          </div>
-          <div className={styles.donutLegend}>
+        <div style={{ opacity: loading ? 0.3 : 1, transition: 'opacity 0.25s ease', pointerEvents: loading ? 'none' : 'auto' }}>
+          {/* KPI Cards */}
+          <div className={styles.kpiGrid}>
             {[
-              { label: 'Genuine', pct: `${genuinePct}%`, color: 'var(--color-primary)' },
-              { label: 'Suspicious', pct: `${suspiciousPct}%`, color: 'var(--color-secondary)' },
-              { label: 'Unverified', pct: `${unverifiedPct}%`, color: 'var(--color-on-surface-variant)' },
-            ].map((l, i) => (
-              <div key={i} className={styles.legendItem}>
-                <span className={styles.legendDot} style={{ background: l.color }}></span>
-                <span className={styles.legendLabel}>{l.label}</span>
-                <span className={styles.legendPct} style={{ color: l.color }}>{l.pct}</span>
+              { label: 'Total Scans', value: totalScans.toLocaleString(), sub: 'Scans captured', icon: 'qr_code_scanner', color: 'var(--color-primary)' },
+              { label: 'Suspicious Items', value: suspiciousCount.toLocaleString(), sub: `${stats?.suspicious_rate ?? 0}% rate`, icon: 'warning', color: 'var(--color-secondary)' },
+              { label: 'Losses Avoided', value: stats ? formatPKR(stats.estimated_losses_pkr) : 'PKR 0', sub: 'Estimated retail value', icon: 'payments', color: 'var(--color-primary)' },
+              { label: 'Unverified Products', value: unverifiedCount.toLocaleString(), sub: 'Unregistered SKU scans', icon: 'help_outline', color: 'var(--color-on-surface-variant)' },
+            ].map((kpi, i) => (
+              <div key={i} className={styles.kpiCard}>
+                <div className={styles.kpiTop}>
+                  <span className={styles.kpiLabel}>{kpi.label}</span>
+                  <div className={styles.kpiIcon} style={{ color: kpi.color, background: kpi.color + '15' }}>
+                    <span className="material-symbols-outlined">{kpi.icon}</span>
+                  </div>
+                </div>
+                <div className={styles.kpiValue} style={{ color: kpi.color }}>{kpi.value}</div>
+                <div className={styles.kpiDelta} style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {kpi.sub}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      </div>
 
-      {/* Incident Table */}
-      <div className={styles.tableCard}>
-        <div className={styles.tableHeader}>
-          <h3 className={styles.cardTitle}>Recent Scans & Incidents</h3>
-          <Link href="/scan/history" className={styles.viewAllLink}>
-            View all <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_forward</span>
-          </Link>
-        </div>
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {['Scan ID', 'Product', 'Batch No.', 'Location', 'Verdict', 'Confidence', 'Time'].map(h => (
-                  <th key={h} className={styles.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {recentScans.map((row, i) => (
-                <tr key={i} className={styles.tr}>
-                  <td className={styles.td} style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '12px' }}>
-                    {row.id.substring(0, 8)}...
-                  </td>
-                  <td className={styles.td}>{row.product_name || 'Unregistered Product'}</td>
-                  <td className={styles.td} style={{ fontFamily: 'monospace', fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
-                    {row.extracted_batch || 'No Batch'}
-                  </td>
-                  <td className={styles.td}>{row.area_name || 'Karachi'}</td>
-                  <td className={styles.td}>
-                    <span className={styles.statusBadge} style={{ color: statusColors[row.verdict], background: statusBg[row.verdict], border: `1px solid ${statusColors[row.verdict]}30` }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{statusIcons[row.verdict]}</span>
-                      {row.verdict.charAt(0).toUpperCase() + row.verdict.slice(1)}
-                    </span>
-                  </td>
-                  <td className={styles.td}>
-                    <div className={styles.confidenceCell}>
-                      <div className={styles.miniBar}>
-                        <div className={styles.miniBarFill} style={{ width: `${Math.round(row.confidence * 100)}%`, background: statusColors[row.verdict] }}></div>
-                      </div>
-                      <span style={{ color: statusColors[row.verdict], fontWeight: 600, fontSize: '13px', minWidth: '36px' }}>
-                        {Math.round(row.confidence * 100)}%
-                      </span>
+          {/* Chart + Map/Hotspot Areas row */}
+          <div className={styles.chartRow}>
+            <div className={styles.chartCard}>
+              <h3 className={styles.cardTitle}>Hotspot Areas (Karachi)</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', overflowY: 'auto', paddingRight: '8px' }}>
+                {heatmap.map((area, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div>
+                      <p style={{ fontWeight: 600, color: 'white', fontSize: '14px' }}>{area.area_name}</p>
+                      <p style={{ fontSize: '12px', color: 'var(--color-on-surface-variant)', marginTop: '2px' }}>
+                        Lat: {area.latitude?.toFixed(4) || 'N/A'}, Lng: {area.longitude?.toFixed(4) || 'N/A'}
+                      </p>
                     </div>
-                  </td>
-                  <td className={styles.td} style={{ color: 'var(--color-on-surface-variant)', fontSize: '13px' }}>
-                    {new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                </tr>
-              ))}
-              {recentScans.length === 0 && (
-                <tr>
-                  <td colSpan={7} className={styles.td} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-on-surface-variant)' }}>
-                    No scans logged yet. Use the scan portal to create one.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontWeight: 700, color: 'var(--color-secondary)', fontSize: '15px' }}>
+                        {area.report_count} Scans
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--color-error)', marginTop: '2px' }}>
+                        {area.suspicious_rate}% Suspicious
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {heatmap.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--color-on-surface-variant)', fontSize: '14px' }}>
+                    No regional hotspots detected yet.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.donutCard}>
+              <h3 className={styles.cardTitle}>Result Breakdown</h3>
+              <div className={styles.donutChart}>
+                <div
+                  className={styles.donutRing}
+                  style={{
+                    background: `conic-gradient(
+                      var(--color-primary) 0% ${genuinePct}%,
+                      var(--color-secondary) ${genuinePct}% ${Number(genuinePct) + Number(suspiciousPct)}%,
+                      var(--color-on-surface-variant) ${Number(genuinePct) + Number(suspiciousPct)}% 100%
+                    )`
+                  }}
+                ></div>
+                <div className={styles.donutCenter}>
+                  <span className={styles.donutValue}>{genuinePct}%</span>
+                  <span className={styles.donutSub}>Genuine</span>
+                </div>
+              </div>
+              <div className={styles.donutLegend}>
+                {[
+                  { label: 'Genuine', pct: `${genuinePct}%`, color: 'var(--color-primary)' },
+                  { label: 'Suspicious', pct: `${suspiciousPct}%`, color: 'var(--color-secondary)' },
+                  { label: 'Unverified', pct: `${unverifiedPct}%`, color: 'var(--color-on-surface-variant)' },
+                ].map((l, i) => (
+                  <div key={i} className={styles.legendItem}>
+                    <span className={styles.legendDot} style={{ background: l.color }}></span>
+                    <span className={styles.legendLabel}>{l.label}</span>
+                    <span className={styles.legendPct} style={{ color: l.color }}>{l.pct}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Incident Table */}
+          <div className={styles.tableCard}>
+            <div className={styles.tableHeader}>
+              <h3 className={styles.cardTitle}>Recent Scans & Incidents</h3>
+              <Link href="/scan/history" className={styles.viewAllLink}>
+                View all <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_forward</span>
+              </Link>
+            </div>
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    {['Scan ID', 'Product', 'Batch No.', 'Location', 'Verdict', 'Confidence', 'Time'].map(h => (
+                      <th key={h} className={styles.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentScans.map((row, i) => (
+                    <tr key={i} className={styles.tr}>
+                      <td className={styles.td} style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '12px' }}>
+                        {row.id.substring(0, 8)}...
+                      </td>
+                      <td className={styles.td}>{row.product_name || 'Unregistered Product'}</td>
+                      <td className={styles.td} style={{ fontFamily: 'monospace', fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
+                        {row.extracted_batch || 'No Batch'}
+                      </td>
+                      <td className={styles.td}>{row.area_name || 'Karachi'}</td>
+                      <td className={styles.td}>
+                        <span className={styles.statusBadge} style={{ color: statusColors[row.verdict], background: statusBg[row.verdict], border: `1px solid ${statusColors[row.verdict]}30` }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{statusIcons[row.verdict]}</span>
+                          {row.verdict.charAt(0).toUpperCase() + row.verdict.slice(1)}
+                        </span>
+                      </td>
+                      <td className={styles.td}>
+                        <div className={styles.confidenceCell}>
+                          <div className={styles.miniBar}>
+                            <div className={styles.miniBarFill} style={{ width: `${Math.round(row.confidence * 100)}%`, background: statusColors[row.verdict] }}></div>
+                          </div>
+                          <span style={{ color: statusColors[row.verdict], fontWeight: 600, fontSize: '13px', minWidth: '36px' }}>
+                            {Math.round(row.confidence * 100)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className={styles.td} style={{ color: 'var(--color-on-surface-variant)', fontSize: '13px' }}>
+                        {new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  ))}
+                  {recentScans.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className={styles.td} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-on-surface-variant)' }}>
+                        No scans logged yet. Use the scan portal to create one.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>

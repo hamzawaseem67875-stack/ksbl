@@ -80,10 +80,9 @@ export async function GET(req: NextRequest) {
     if (!brandData || brandData.length === 0) {
       return NextResponse.json({ error: "Brand not found" }, { status: 404 });
     }
-
-    // 2. Get all reports for this brand in the date range
-    const reportsRes = await fetch(
-      `${supabaseUrl}/rest/v1/Report?brand_id=eq.${brand_id}&created_at=gte.${from.toISOString()}&created_at=lte.${to.toISOString()}&select=scan_id`,
+    // 2. Find all product IDs for this brand
+    const productsRes = await fetch(
+      `${supabaseUrl}/rest/v1/Product?brand_name=eq.${encodeURIComponent(brandData[0].name)}&select=id,avg_unit_price_pkr`,
       {
         method: "GET",
         headers: {
@@ -93,46 +92,42 @@ export async function GET(req: NextRequest) {
       }
     );
 
-    if (!reportsRes.ok) {
-      return NextResponse.json({ error: "Failed to fetch reports" }, { status: 500 });
-    }
-
-    const reports = await reportsRes.json();
-    const scanIds = reports.map((r: any) => r.scan_id).filter(Boolean);
-
-    if (scanIds.length === 0) {
-      return NextResponse.json({
-        total_scans: 0,
-        genuine_count: 0,
-        suspicious_count: 0,
-        unverified_count: 0,
-        suspicious_rate: 0,
-        estimated_losses_pkr: 0,
-        date_range: { from: from.toISOString(), to: to.toISOString() },
+    let productIds: string[] = [];
+    const productPriceMap = new Map<string, number>();
+    if (productsRes.ok) {
+      const products = await productsRes.json();
+      products.forEach((p: any) => {
+        if (p.id) {
+          productIds.push(p.id);
+          productPriceMap.set(p.id, p.avg_unit_price_pkr ?? 0);
+        }
       });
     }
 
-    // 3. Fetch scans linked to these reports
-    // Split into chunks of 50 to prevent huge URL strings if there are many scans
-    const chunkSize = 50;
-    const scans: any[] = [];
-    for (let i = 0; i < scanIds.length; i += chunkSize) {
-      const chunk = scanIds.slice(i, i + chunkSize);
-      const chunkRes = await fetch(
-        `${supabaseUrl}/rest/v1/Scan?id=in.(${chunk.join(',')})&select=verdict,product_id`,
-        {
-          method: "GET",
-          headers: {
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`
-          }
-        }
-      );
-      if (chunkRes.ok) {
-        const chunkData = await chunkRes.json();
-        scans.push(...chunkData);
-      }
+    // 3. Query all scans for this brand in the date range
+    let filter = `brand_name=eq.${encodeURIComponent(brandData[0].name)}`;
+    if (productIds.length > 0) {
+      filter = `or=(brand_name.eq.${encodeURIComponent(brandData[0].name)},product_id.in.(${productIds.join(',')}))`;
     }
+
+    const scansRes = await fetch(
+      `${supabaseUrl}/rest/v1/Scan?${filter}&created_at=gte.${from.toISOString()}&created_at=lte.${to.toISOString()}&select=verdict,product_id`,
+      {
+        method: "GET",
+        headers: {
+          "apikey": anonKey,
+          "Authorization": `Bearer ${anonKey}`
+        }
+      }
+    );
+
+    if (!scansRes.ok) {
+      const errText = await scansRes.text();
+      console.error("[GET /api/dashboard/stats] Failed to fetch scans:", scansRes.status, errText);
+      return NextResponse.json({ error: "Failed to fetch scans" }, { status: 500 });
+    }
+
+    const scans = await scansRes.json();
 
     const total_scans = scans.length;
     const genuine_count = scans.filter((s: any) => s.verdict === "genuine").length;
@@ -140,33 +135,14 @@ export async function GET(req: NextRequest) {
     const unverified_count = scans.filter((s: any) => s.verdict === "unverified").length;
     const suspicious_rate = total_scans > 0 ? suspicious_count / total_scans : 0;
 
-    // 4. Calculate estimated losses
-    const productIds = [
-      ...new Set(scans.map((s: any) => s.product_id).filter(Boolean) as string[]),
-    ];
-
-    let avg_price = FALLBACK_UNIT_PRICE_PKR;
-    if (productIds.length > 0) {
-      const prodRes = await fetch(
-        `${supabaseUrl}/rest/v1/Product?id=in.(${productIds.join(',')})&select=avg_unit_price_pkr`,
-        {
-          method: "GET",
-          headers: {
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`
-          }
-        }
-      );
-      if (prodRes.ok) {
-        const products = await prodRes.json();
-        const prices = products.map((p: any) => p.avg_unit_price_pkr).filter((p: number) => p > 0);
-        if (prices.length > 0) {
-          avg_price = prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
-        }
+    // 4. Calculate estimated losses based on unit prices
+    let estimated_losses_pkr = 0;
+    scans.forEach((s: any) => {
+      if (s.verdict === "suspicious") {
+        const price = s.product_id ? (productPriceMap.get(s.product_id) || FALLBACK_UNIT_PRICE_PKR) : FALLBACK_UNIT_PRICE_PKR;
+        estimated_losses_pkr += price;
       }
-    }
-
-    const estimated_losses_pkr = suspicious_count * avg_price;
+    });
 
     return NextResponse.json({
       total_scans,

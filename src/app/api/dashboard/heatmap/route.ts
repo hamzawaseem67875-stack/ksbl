@@ -76,9 +76,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Brand not found" }, { status: 404 });
     }
 
-    // 2. Get all report scan_ids for this brand in the date range
-    const reportsRes = await fetch(
-      `${supabaseUrl}/rest/v1/Report?brand_id=eq.${brand_id}&created_at=gte.${from.toISOString()}&created_at=lte.${to.toISOString()}&select=scan_id`,
+    // 2. Find all product IDs for this brand
+    const productsRes = await fetch(
+      `${supabaseUrl}/rest/v1/Product?brand_name=eq.${encodeURIComponent(brandData[0].name)}&select=id`,
       {
         method: "GET",
         headers: {
@@ -88,37 +88,36 @@ export async function GET(req: NextRequest) {
       }
     );
 
-    if (!reportsRes.ok) {
-      return NextResponse.json({ error: "Failed to fetch reports" }, { status: 500 });
+    let productIds: string[] = [];
+    if (productsRes.ok) {
+      const products = await productsRes.json();
+      productIds = products.map((p: any) => p.id).filter(Boolean);
     }
 
-    const reports = await reportsRes.json();
-    const scanIds = reports.map((r: any) => r.scan_id).filter(Boolean);
-
-    if (scanIds.length === 0) {
-      return NextResponse.json([]);
+    // 3. Query all scans for this brand with location data in the date range
+    let filter = `brand_name=eq.${encodeURIComponent(brandData[0].name)}`;
+    if (productIds.length > 0) {
+      filter = `or=(brand_name.eq.${encodeURIComponent(brandData[0].name)},product_id.in.(${productIds.join(',')}))`;
     }
 
-    // 3. Pull scans with location data
-    const chunkSize = 50;
-    const scans: any[] = [];
-    for (let i = 0; i < scanIds.length; i += chunkSize) {
-      const chunk = scanIds.slice(i, i + chunkSize);
-      const chunkRes = await fetch(
-        `${supabaseUrl}/rest/v1/Scan?id=in.(${chunk.join(',')})&latitude=not.is.null&longitude=not.is.null&select=latitude,longitude,area_name,verdict`,
-        {
-          method: "GET",
-          headers: {
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`
-          }
+    const scansRes = await fetch(
+      `${supabaseUrl}/rest/v1/Scan?${filter}&created_at=gte.${from.toISOString()}&created_at=lte.${to.toISOString()}&latitude=not.is.null&longitude=not.is.null&select=latitude,longitude,area_name,verdict`,
+      {
+        method: "GET",
+        headers: {
+          "apikey": anonKey,
+          "Authorization": `Bearer ${anonKey}`
         }
-      );
-      if (chunkRes.ok) {
-        const chunkData = await chunkRes.json();
-        scans.push(...chunkData);
       }
+    );
+
+    if (!scansRes.ok) {
+      const errText = await scansRes.text();
+      console.error("[GET /api/dashboard/heatmap] Failed to fetch scans:", scansRes.status, errText);
+      return NextResponse.json({ error: "Failed to fetch scans" }, { status: 500 });
     }
+
+    const scans = await scansRes.json();
 
     // Group by area_name, compute centroid + counts
     const areaMap = new Map<

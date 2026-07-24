@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getGeolocation } from '@/lib/api';
 import styles from './processing.module.css';
 
 interface Step {
@@ -64,6 +65,12 @@ export default function ScanProcessingPage() {
     async function runVerification() {
       try {
         const formData = new FormData();
+
+        const geo = await getGeolocation();
+        if (geo) {
+          formData.append('latitude', geo.latitude.toString());
+          formData.append('longitude', geo.longitude.toString());
+        }
         
         if (base64Image) {
           const file = dataURLtoFile(base64Image, 'scan.jpg');
