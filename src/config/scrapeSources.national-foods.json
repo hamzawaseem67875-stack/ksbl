@@ -1,0 +1,129 @@
+{
+  "brand_name": "National Foods",
+  "source_tag": "national_foods_scrape",
+  "user_agent": "ShelfWatchBot/1.0 (+contact=support@shelfwatch.local; purpose=anti-counterfeit reference catalog)",
+  "request_delay_ms": 2000,
+  "sources": [
+    {
+      "id": "nfoods-recipe-mixes",
+      "url": "https://www.nfoods.com/our-food/recipe-mixes/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-ingredients",
+      "url": "https://www.nfoods.com/our-food/ingedients/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-drizzl",
+      "url": "https://www.nfoods.com/our-food/drizzl/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-salt",
+      "url": "https://www.nfoods.com/our-food/salt/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-ketchup",
+      "url": "https://www.nfoods.com/our-food/ketchup/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-pickles",
+      "url": "https://www.nfoods.com/our-food/pickles/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-mayonnaise",
+      "url": "https://www.nfoods.com/our-food/mayonnaise/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-desserts-jams-jellies",
+      "url": "https://www.nfoods.com/our-food/desserts-jams-jellies/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "nfoods-jams",
+      "url": "https://www.nfoods.com/our-food/jams/",
+      "enabled": true,
+      "selectors": {
+        "item": "ul.product-listing > li",
+        "name": ".product-name",
+        "pack_size": ".product-pop-up .tagline",
+        "image": { "selector": ".product-img img", "attr": "data-src" },
+        "price": null
+      }
+    },
+    {
+      "id": "ecommerce-fallback-example",
+      "url": "https://REPLACE_ME",
+      "enabled": false,
+      "notes": "No Naheed/Metro/Daraz URLs were supplied yet. Fill in a real listing page URL + inspect its HTML for the correct selectors before flipping enabled to true — do not guess.",
+      "selectors": {
+        "item": "REPLACE_ME",
+        "name": "REPLACE_ME",
+        "pack_size": "REPLACE_ME",
+        "image": { "selector": "REPLACE_ME", "attr": "src" },
+        "price": "REPLACE_ME"
+      }
+    }
+  ]
+}

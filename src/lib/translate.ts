@@ -164,3 +164,101 @@ export function getVerdictTextSync(verdict: VerdictKey): Omit<VerdictText, "reas
     english_text: GLOSSARY[verdict].english,
   };
 }
+
+// ─── Reference-image comparison (RAG vector-match follow-up) ──────────────────
+
+const COMPARE_TIMEOUT_MS = 6000;
+const DEFAULT_COMPARISON_REASON =
+  "Reference image comparison unavailable — verdict based on standard pipeline.";
+
+async function fetchImageAsBase64(url: string): Promise<{ mimeType: string; data: string } | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+
+    const mimeType = res.headers.get("content-type") ?? "image/jpeg";
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { mimeType, data: buffer.toString("base64") };
+  } catch (err) {
+    console.warn(`[Translate] Failed to fetch image for comparison (${url}):`, err);
+    return null;
+  }
+}
+
+/**
+ * Ask Gemini to compare a scanned product photo against the matched reference
+ * image (found via vector similarity search — see lib/vectorSearch.ts) and
+ * describe any visual discrepancies in one concise sentence: logo, font,
+ * color, print quality, batch code format. Same "one sentence, factual, not
+ * alarming" style as getDefaultReason().
+ *
+ * Requires both images to be fetched and base64-encoded as inline_data parts —
+ * Gemini's file_data.file_uri only accepts URIs from its own Files API, not
+ * arbitrary public URLs like Vercel Blob links.
+ *
+ * Never throws — falls back to a generic "comparison unavailable" string.
+ */
+export async function compareProductImages(
+  scanImageUrl: string,
+  referenceImageUrl: string,
+  context: { product_name?: string | null; brand_name?: string | null } = {}
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return DEFAULT_COMPARISON_REASON;
+
+  const [scanImage, referenceImage] = await Promise.all([
+    fetchImageAsBase64(scanImageUrl),
+    fetchImageAsBase64(referenceImageUrl),
+  ]);
+
+  if (!scanImage || !referenceImage) return DEFAULT_COMPARISON_REASON;
+
+  try {
+    const prompt = `You are a product authenticity assistant for ShelfWatch, an anti-counterfeit system for Pakistan's FMCG market.
+
+The FIRST image is a photo just scanned by a user. The SECOND image is the verified reference/genuine product image for "${context.product_name ?? "this product"}" (brand: ${context.brand_name ?? "unknown"}), matched via image similarity search.
+
+Compare the two images and write ONE concise sentence (max 20 words) in English noting any visual discrepancies — logo, font, color, print quality, or batch code format. If they appear consistent, say so factually. Be factual, not alarming. No Urdu.`;
+
+    const model = process.env.GEMINI_VISION_MODEL ?? "gemini-3.1-flash-lite";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), COMPARE_TIMEOUT_MS);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: scanImage.mimeType, data: scanImage.data } },
+              { inline_data: { mime_type: referenceImage.mimeType, data: referenceImage.data } },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.warn(`[Translate] Gemini vision comparison returned status ${response.status}`);
+      return DEFAULT_COMPARISON_REASON;
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    return text ? text.trim() : DEFAULT_COMPARISON_REASON;
+  } catch (err) {
+    console.error("[Translate] compareProductImages failed or timed out:", err);
+    return DEFAULT_COMPARISON_REASON;
+  }
+}

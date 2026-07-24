@@ -2,11 +2,13 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 // ─────────────────────────────────────────────
@@ -44,6 +46,13 @@ enum ProductStatus {
   recalled
 }
 
+enum ScrapeRunStatus {
+  running
+  success
+  partial_failure
+  failed
+}
+
 // ─────────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────────
@@ -65,11 +74,37 @@ model Product {
   product_name            String
   reference_batch_pattern String        // regex or prefix, e.g. "^XP-[0-9]{3}-KHI"
   reference_image_url     String?
+  pack_size               String?       // e.g. "30g,210g,400g,800g,3.25kg" — raw scraped pack-size list
   avg_unit_price_pkr      Float         @default(0) // used for estimated_losses calculation
   status                  ProductStatus @default(active)
+  // Provenance: "manual" | "national_foods_scrape" | "open_food_facts"
+  source                  String        @default("manual")
+  last_scraped_at         DateTime?
+  // CLIP image embedding for RAG-style vector similarity search.
+  // Written/read via raw SQL (prisma/sql/pgvector_setup.sql) — Prisma Client
+  // cannot query or write Unsupported columns directly.
+  embedding               Unsupported("vector(512)")?
   created_at              DateTime      @default(now())
 
   scans Scan[]
+
+  @@index([source])
+}
+
+model ScrapeRun {
+  id               String          @id @default(cuid())
+  source           String          // e.g. "national_foods_scrape"
+  status           ScrapeRunStatus @default(running)
+  products_found   Int             @default(0)
+  products_created Int             @default(0)
+  products_updated Int             @default(0)
+  products_failed  Int             @default(0)
+  error_log        Json?
+  started_at       DateTime        @default(now())
+  finished_at      DateTime?
+
+  @@index([source])
+  @@index([status])
 }
 
 model Scan {

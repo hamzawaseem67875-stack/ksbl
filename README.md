@@ -105,6 +105,86 @@ The verdict Urdu/English text itself is hardcoded (not translated) — Claude on
    - Verify Token: the string you set in `WHATSAPP_VERIFY_TOKEN`
    - Subscribe to: `messages`
 
+### 7 · National Foods RAG Scraper & Vector Search
+
+National Foods has no public product API (unlike international products,
+which use Open Food Facts / UPCitemdb — see §1 above). Instead, ShelfWatch
+builds its own reference catalog by scraping National Foods' official
+product listings, embedding each product's image with CLIP, and matching
+scanned photos against those embeddings via pgvector cosine similarity —
+*before* falling back to the standard barcode/OCR pipeline. See
+`src/lib/vectorSearch.ts` and `src/app/api/scraper/*`.
+
+**One-time setup:**
+
+1. Run `npx prisma db push` to sync `schema.prisma`'s new fields to your
+   database. **If this can't reach your database** (Supabase's connection
+   pooler can be finicky to get exactly right locally — see troubleshooting
+   below), skip straight to step 2, which does the same thing as plain SQL
+   you can paste into the Supabase Dashboard's SQL Editor instead, which
+   always works regardless of local connectivity.
+2. In the Supabase Dashboard → SQL Editor, run, **in this order**:
+   1. `prisma/sql/manual_schema_patch.sql` — adds `Product.source` /
+      `last_scraped_at` / `pack_size` and the `ScrapeRun` table. Skip this if
+      step 1 already succeeded.
+   2. `prisma/sql/pgvector_setup.sql` — creates the `vector` extension, the
+      `Product.embedding` column, and the `set_product_embedding` /
+      `match_products` RPC functions. Must run after step 2.1 (or after a
+      successful `prisma db push`) since it alters the same `Product` table.
+3. Add `CRON_SECRET`, and optionally `EMBED_MODEL_ID` / `EMBEDDING_DIM` /
+   `VECTOR_MATCH_THRESHOLD`, to your `.env.local` (see `.env.example`).
+
+**Troubleshooting `prisma db push` connectivity:** Supabase's connection
+pooler hostname includes a node index (e.g. `aws-1-ap-south-1`, not always
+`aws-0`) that varies per project — copy the exact string from the dashboard's
+green **Connect** button (not Settings → Database) → **Transaction pooler**
+tab, rather than assuming the format. The pooler's transaction-mode port
+(6543) doesn't support DDL; use the session-mode port (5432) on the same
+host for `prisma db push`/`migrate` specifically. Newer Supabase projects
+often don't provision the legacy direct-connection host
+(`db.<ref>.supabase.co`) at all — if it doesn't resolve in DNS, that's why,
+not a network problem on your end.
+
+**Adding a new scrape source:**
+
+Edit `src/config/scrapeSources.national-foods.json` (or set the
+`SCRAPER_SOURCES_JSON` env var to override it without a redeploy). Each
+entry is:
+
+```json
+{
+  "id": "some-unique-id",
+  "url": "https://example.com/category-page",
+  "enabled": true,
+  "selectors": {
+    "item": "CSS selector for each product card",
+    "name": "CSS selector for the product name, relative to the card",
+    "pack_size": "CSS selector for pack size / variant text, or null",
+    "image": { "selector": "CSS selector for the <img>", "attr": "src or data-src for lazy-loaded images" },
+    "price": "CSS selector for price text, or null"
+  }
+}
+```
+
+Inspect the real page HTML before writing selectors (`curl` the URL, don't
+guess) — lazy-loaded sites commonly serve the image URL in `data-src`, not
+`src`. Leave `enabled: false` until you've verified the selectors against
+real markup; disabled sources are skipped and logged, not scraped.
+
+**Manually triggering a re-scrape or embedding backfill:**
+
+```bash
+curl -X POST https://your-app.vercel.app/api/scraper/national-foods \
+  -H "Authorization: Bearer $CRON_SECRET"
+
+curl -X POST https://your-app.vercel.app/api/scraper/backfill-embeddings \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+The scraper also runs automatically via the `vercel.json` cron entry
+(weekly, Mondays 3am) — Vercel Cron Jobs trigger via `GET`, which both
+routes also accept.
+
 ---
 
 ## API Reference
@@ -117,6 +197,8 @@ The verdict Urdu/English text itself is hardcoded (not translated) — Claude on
 | `POST` | `/api/report` | Consumer one-tap suspicious report |
 | `GET` | `/api/whatsapp-webhook` | Meta webhook verification |
 | `POST` | `/api/whatsapp-webhook` | Incoming WhatsApp message handler |
+| `GET`/`POST` | `/api/scraper/national-foods` | Scrape National Foods listings into the reference catalog (cron + manual) |
+| `GET`/`POST` | `/api/scraper/backfill-embeddings` | Generate embeddings for products missing one |
 
 ### POST /api/scan
 

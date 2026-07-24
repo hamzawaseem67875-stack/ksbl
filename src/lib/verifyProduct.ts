@@ -7,18 +7,20 @@
  *
  * Pipeline:
  *  1. Upload image to Vercel Blob → public URL
- *  2. Race OCR + CV calls with a 5 s timeout guard
- *  3. Lookup product by barcode/SKU or extracted batch pattern
+ *  2. Race OCR + CV + vector image search (RAG match) with a timeout guard
+ *  3. Lookup product by barcode/SKU → vector image match → batch pattern
  *  4. Rule-based verdict (genuine | suspicious | unverified)
- *  5. Write Scan row to DB
- *  6. If suspicious → write Report row
- *  7. Return full verdict payload
+ *  5. Translate verdict — Gemini image comparison when identified via RAG match
+ *  6. Write Scan row to DB
+ *  7. If suspicious → write Report row
+ *  8. Return full verdict payload
  */
 
 import { uploadImage } from "./blob";
 import { runOcr } from "./ocr";
 import { scorePackaging } from "./cv";
-import { getVerdictText } from "./translate";
+import { getVerdictText, getVerdictTextSync, compareProductImages } from "./translate";
+import { findProductByImage, type VectorMatch } from "./vectorSearch";
 import type { Verdict, ScannedByRole } from "@prisma/client";
 
 // ─── Thresholds ───────────────────────────────────────────────────────────────
@@ -31,6 +33,9 @@ const SUSPICIOUS_THRESHOLD = 0.55;
 
 /** External API timeout in ms before falling back to rule-only verdict */
 const API_TIMEOUT_MS = 5000;
+
+/** Vector search (embedding + RPC) timeout — slightly longer than OCR/CV since it's two network hops */
+const VECTOR_TIMEOUT_MS = 7000;
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
@@ -98,6 +103,12 @@ export interface VerifyResult {
   cv_anomaly_score: number | null;
   product_name: string | null;
   brand_name: string | null;
+  /** RAG-style image identification result — see lib/vectorSearch.ts */
+  image_match: {
+    matched: boolean;
+    similarity: number | null;
+    note?: string;
+  };
 }
 
 // ─── Timeout helper ───────────────────────────────────────────────────────────
@@ -185,49 +196,54 @@ async function fetchUPCItemDB(barcode: string): Promise<{ product_name: string |
   return null;
 }
 
-async function findProduct(barcode?: string | null, batch?: string | null) {
+/** Exact SKU match (barcode scan) — the strongest identity signal, tried first. */
+async function findProductByBarcode(barcode: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
   if (!supabaseUrl || !anonKey) return null;
 
-  // 1. Exact SKU match (barcode scan)
-  if (barcode) {
-    try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/Product?sku=eq.${encodeURIComponent(barcode.trim())}`, {
-        headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0) return data[0];
-      }
-    } catch (err) {
-      console.error("[verifyProduct] findProduct SKU fetch failed:", err);
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/Product?sku=eq.${encodeURIComponent(barcode.trim())}`, {
+      headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0) return data[0];
     }
+  } catch (err) {
+    console.error("[verifyProduct] findProductByBarcode fetch failed:", err);
   }
+  return null;
+}
 
-  // 2. Batch pattern match — iterate and test regex against extracted batch
-  if (batch) {
-    try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/Product?select=id,sku,brand_name,product_name,reference_batch_pattern,avg_unit_price_pkr`, {
-        headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
-      });
-      if (res.ok) {
-        const products = await res.json();
-        for (const p of products) {
-          try {
-            const re = new RegExp(p.reference_batch_pattern, "i");
-            if (re.test(batch)) return p;
-          } catch {
-            // invalid regex in DB — skip
-          }
+/**
+ * Batch pattern match — iterate and test regex against extracted batch.
+ * Lower-precedence than an exact barcode or vector image match: a loose
+ * regex scan across every product is a weaker identity signal than either.
+ */
+async function findProductByBatchPattern(batch: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anonKey) return null;
+
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/Product?select=id,sku,brand_name,product_name,reference_batch_pattern,avg_unit_price_pkr`, {
+      headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
+    });
+    if (res.ok) {
+      const products = await res.json();
+      for (const p of products) {
+        try {
+          const re = new RegExp(p.reference_batch_pattern, "i");
+          if (re.test(batch)) return p;
+        } catch {
+          // invalid regex in DB — skip
         }
       }
-    } catch (err) {
-      console.error("[verifyProduct] findProduct batch list fetch failed:", err);
     }
+  } catch (err) {
+    console.error("[verifyProduct] findProductByBatchPattern fetch failed:", err);
   }
-
   return null;
 }
 
@@ -236,11 +252,25 @@ async function findProduct(barcode?: string | null, batch?: string | null) {
 function computeVerdict(
   product: { reference_batch_pattern: string } | null,
   batch: string | null,
-  anomalyScore: number
+  anomalyScore: number,
+  imageIdentified?: { similarity: number }
 ): { verdict: Verdict; confidence: number } {
   if (!product) {
     // No product match → unverified regardless of CV score
     return { verdict: "unverified", confidence: 0.4 };
+  }
+
+  // Product was identified via vector image match rather than an exact
+  // barcode/batch record — scraped catalogs (e.g. National Foods) have no
+  // real reference_batch_pattern, so requiring a batch match here would
+  // wrongly flag genuine image-identified scans as suspicious. Use CV
+  // anomaly score + match similarity as the genuineness signal instead.
+  if (imageIdentified) {
+    if (anomalyScore < SUSPICIOUS_THRESHOLD) {
+      const confidence = (1 - anomalyScore) * imageIdentified.similarity;
+      return { verdict: "genuine", confidence: Math.min(confidence, 0.99) };
+    }
+    return { verdict: "suspicious", confidence: Math.min(anomalyScore, 0.99) };
   }
 
   const batchMatches = batch
@@ -286,16 +316,18 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
     imageUrl = `https://placeholder.shelfwatch.pk/scan/${filename}`;
   }
 
-  // ── Step 2: Race OCR + CV with timeout ───────────────────────────────────
+  // ── Step 2: Race OCR + CV + vector image search with timeout ─────────────
   let ocrBatch: string | null = null;
   let ocrMfgDate: string | null = null;
   let ocrMrp: string | null = null;
   let ocrRaw: Record<string, unknown> = {};
   let cvScore: number | null = null;
+  let vectorMatch: VectorMatch | null = null;
 
-  const [ocrSettled, cvSettled] = await Promise.allSettled([
+  const [ocrSettled, cvSettled, vectorSettled] = await Promise.allSettled([
     withTimeout(runOcr(imageUrl), API_TIMEOUT_MS),
     withTimeout(scorePackaging(imageUrl), API_TIMEOUT_MS),
+    withTimeout(findProductByImage(imageUrl), VECTOR_TIMEOUT_MS),
   ]);
 
   if (ocrSettled.status === "fulfilled") {
@@ -314,8 +346,30 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
     cvScore = 0.5; // neutral fallback
   }
 
+  if (vectorSettled.status === "fulfilled") {
+    vectorMatch = vectorSettled.value; // null if no embedding/no match above threshold — handled gracefully below
+  } else {
+    console.warn("[verifyProduct] Vector image search timed out or failed:", vectorSettled.reason);
+  }
+
   // ── Step 3: Product lookup ────────────────────────────────────────────────
-  const product = await findProduct(input.barcode, ocrBatch);
+  // Precedence: exact barcode/SKU (strongest) → vector image match → batch
+  // pattern regex scan → external OFF/UPCitemdb metadata (barcode-only).
+  let product: VectorMatch["product"] | null = null;
+  let identifiedViaImage = false;
+
+  if (input.barcode) {
+    product = await findProductByBarcode(input.barcode);
+  }
+
+  if (!product && vectorMatch) {
+    product = vectorMatch.product;
+    identifiedViaImage = true;
+  }
+
+  if (!product && ocrBatch) {
+    product = await findProductByBatchPattern(ocrBatch);
+  }
 
   // Fallback metadata lookup from Open Food Facts / UPCitemdb if local DB has no record
   let offProduct: { product_name: string | null; brand_name: string | null } | null = null;
@@ -326,15 +380,39 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
     }
   }
 
+  const imageMatch = {
+    matched: identifiedViaImage,
+    similarity: vectorMatch?.similarity ?? null,
+    ...(identifiedViaImage ? {} : { note: "Unrecognized product / low confidence" }),
+  };
+
   // ── Step 4: Verdict ───────────────────────────────────────────────────────
-  const { verdict, confidence } = computeVerdict(product, ocrBatch, cvScore ?? 0.5);
+  const { verdict, confidence } = computeVerdict(
+    product,
+    ocrBatch,
+    cvScore ?? 0.5,
+    identifiedViaImage && vectorMatch ? { similarity: vectorMatch.similarity } : undefined
+  );
 
   // ── Step 5: Translate verdict ─────────────────────────────────────────────
-  const verdictText = await getVerdictText(verdict, {
-    batch: ocrBatch,
-    anomaly_score: cvScore,
-    brand_name: product?.brand_name ?? offProduct?.brand_name ?? undefined,
-  });
+  // When the product was identified via image match and has a reference
+  // image, ask Gemini to compare the two photos directly and use that as the
+  // reason (richer, image-grounded) instead of the generic batch/score-based
+  // reason — this also saves a second Gemini call.
+  let verdictText: { urdu_text: string; english_text: string; reason: string };
+  if (identifiedViaImage && product?.reference_image_url) {
+    const comparisonReason = await compareProductImages(imageUrl, product.reference_image_url, {
+      product_name: product.product_name,
+      brand_name: product.brand_name,
+    });
+    verdictText = { ...getVerdictTextSync(verdict), reason: comparisonReason };
+  } else {
+    verdictText = await getVerdictText(verdict, {
+      batch: ocrBatch,
+      anomaly_score: cvScore,
+      brand_name: product?.brand_name ?? offProduct?.brand_name ?? undefined,
+    });
+  }
 
   // ── Step 6: Write Scan row ────────────────────────────────────────────────
   const KARACHI_AREAS = [
@@ -440,5 +518,6 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
     cv_anomaly_score: cvScore,
     product_name: product?.product_name ?? offProduct?.product_name ?? null,
     brand_name: product?.brand_name ?? offProduct?.brand_name ?? null,
+    image_match: imageMatch,
   };
 }
