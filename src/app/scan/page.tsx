@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import styles from './scan.module.css';
-import { postScan, getGeolocation, storeScanResult, getScanHistory, ScanHistoryItem, verdictColor } from '@/lib/api';
+import { getGeolocation, getScanHistory, ScanHistoryItem, verdictColor } from '@/lib/api';
 
 export default function ScanPage() {
   const router = useRouter();
@@ -23,6 +23,10 @@ export default function ScanPage() {
       }
     }
     loadHistory();
+
+    // Prime the browser's location permission/GPS fix early so it's ready
+    // (and cached via maximumAge) by the time /scan/processing needs it.
+    getGeolocation();
   }, []);
 
   // Convert captured file to base64 and save to sessionStorage, then navigate to /scan/processing

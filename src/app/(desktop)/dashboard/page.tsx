@@ -19,16 +19,16 @@ export default function DashboardPage() {
       const res = await getScanHistory(10);
       setLoading(false);
       if (res.data && res.data.length > 0) {
-        // Find the most recent suspicious scan to highlight as the active incident
-        const suspicious = res.data.find(s => s.verdict === 'suspicious') || res.data[0];
-        setActiveIncident(suspicious);
+        // /api/scans already orders by created_at desc, so the first item is the latest scan
+        const latest = res.data[0];
+        setActiveIncident(latest);
 
         // Check if this scan has already been flagged in Supabase
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         if (supabaseUrl && anonKey) {
           try {
-            const repRes = await fetch(`${supabaseUrl}/rest/v1/Report?scan_id=eq.${suspicious.id}`, {
+            const repRes = await fetch(`${supabaseUrl}/rest/v1/Report?scan_id=eq.${latest.id}`, {
               headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
             });
             if (repRes.ok) {

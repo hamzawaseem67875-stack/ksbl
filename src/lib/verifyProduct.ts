@@ -415,21 +415,14 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
   }
 
   // ── Step 6: Write Scan row ────────────────────────────────────────────────
-  const KARACHI_AREAS = [
-    { name: "Korangi Industrial Area", lat: 24.8338, lng: 67.1035 },
-    { name: "Liaquatabad", lat: 24.9158, lng: 67.0431 },
-    { name: "SITE Area", lat: 24.9087, lng: 66.9989 },
-    { name: "Orangi Town", lat: 24.9495, lng: 67.0142 },
-    { name: "Clifton", lat: 24.8138, lng: 67.0336 },
-    { name: "Gulshan-e-Iqbal", lat: 24.9180, lng: 67.0970 },
-    { name: "Saddar", lat: 24.8608, lng: 67.0104 }
-  ];
-  const randomArea = KARACHI_AREAS[Math.floor(Math.random() * KARACHI_AREAS.length)];
-  const scanLat = input.latitude ?? randomArea.lat;
-  const scanLng = input.longitude ?? randomArea.lng;
+  // Use the device's real GPS coordinates only — never fabricate a location.
+  const scanLat = input.latitude ?? null;
+  const scanLng = input.longitude ?? null;
   let scanArea = input.area_name;
   if (!scanArea) {
-    scanArea = await reverseGeocode(scanLat, scanLng);
+    scanArea = scanLat != null && scanLng != null
+      ? await reverseGeocode(scanLat, scanLng)
+      : "Location unavailable";
   }
 
   let scanId = "scan-" + Date.now();

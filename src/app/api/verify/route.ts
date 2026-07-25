@@ -212,21 +212,16 @@ export async function POST(req: NextRequest) {
       dbVerdict = "unverified";
     }
 
-    const KARACHI_AREAS = [
-      { name: "Korangi Industrial Area", lat: 24.8338, lng: 67.1035 },
-      { name: "Liaquatabad", lat: 24.9158, lng: 67.0431 },
-      { name: "SITE Area", lat: 24.9087, lng: 66.9989 },
-      { name: "Orangi Town", lat: 24.9495, lng: 67.0142 },
-      { name: "Clifton", lat: 24.8138, lng: 67.0336 },
-      { name: "Gulshan-e-Iqbal", lat: 24.9180, lng: 67.0970 },
-      { name: "Saddar", lat: 24.8608, lng: 67.0104 }
-    ];
-    const randomArea = KARACHI_AREAS[Math.floor(Math.random() * KARACHI_AREAS.length)];
-    const scanLat = formData.get("latitude") ? parseFloat(formData.get("latitude") as string) : randomArea.lat;
-    const scanLng = formData.get("longitude") ? parseFloat(formData.get("longitude") as string) : randomArea.lng;
+    // Use the device's real GPS coordinates only — never fabricate a location.
+    const rawLat = formData.get("latitude") as string | null;
+    const rawLng = formData.get("longitude") as string | null;
+    const scanLat = rawLat ? parseFloat(rawLat) : null;
+    const scanLng = rawLng ? parseFloat(rawLng) : null;
     let scanArea = formData.get("area_name") as string | null;
     if (!scanArea) {
-      scanArea = await reverseGeocode(scanLat, scanLng);
+      scanArea = scanLat != null && scanLng != null
+        ? await reverseGeocode(scanLat, scanLng)
+        : "Location unavailable";
     }
 
     let scanId = "scan-" + Date.now();

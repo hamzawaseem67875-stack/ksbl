@@ -217,7 +217,7 @@ export async function getGeolocation(): Promise<{
       (pos) =>
         resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       () => resolve(null),
-      { timeout: 3000, maximumAge: 60000 }
+      { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true }
     );
   });
 }
