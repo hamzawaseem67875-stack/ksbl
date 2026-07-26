@@ -2,15 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import styles from './history.module.css';
-import { getScanHistory, ScanHistoryItem, verdictColor, verdictIcon } from '@/lib/api';
+import { getMyScanHistory, getMe, postLogout, ScanHistoryItem, CustomerProfile, verdictColor, verdictIcon } from '@/lib/api';
 
 type FilterType = 'all' | 'genuine' | 'suspicious' | 'unverified';
 
 export default function ScanHistoryPage() {
+  const router = useRouter();
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [scans, setScans] = useState<ScanHistoryItem[]>([]);
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,12 +21,15 @@ export default function ScanHistoryPage() {
     async function loadScans() {
       setLoading(true);
       setError(null);
-      const res = await getScanHistory(50); // get last 50 scans
+      const [scansRes, meRes] = await Promise.all([getMyScanHistory(50), getMe()]);
       setLoading(false);
-      if (res.error) {
-        setError(res.error);
-      } else if (res.data) {
-        setScans(res.data);
+      if (scansRes.error) {
+        setError(scansRes.error);
+      } else if (scansRes.data) {
+        setScans(scansRes.data);
+      }
+      if (meRes.data) {
+        setProfile(meRes.data);
       }
     }
     loadScans();
@@ -64,6 +70,33 @@ export default function ScanHistoryPage() {
       </header>
 
       <main className={styles.main}>
+        {profile && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            margin: '0 16px 16px',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            background: 'rgba(70,241,197,0.08)',
+            border: '1px solid rgba(70,241,197,0.2)',
+          }}>
+            <span style={{ fontSize: '14px' }}>Hi, {profile.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>military_tech</span>
+                {profile.score_points} pts
+              </span>
+              <button
+                onClick={async () => { await postLogout(); router.push('/login'); }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-on-surface-variant)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Search */}
         <div className={styles.searchWrapper}>
           <span className="material-symbols-outlined" style={{ color: 'var(--color-on-surface-variant)', fontSize: '20px' }}>search</span>

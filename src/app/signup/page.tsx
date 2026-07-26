@@ -1,22 +1,13 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import styles from './login.module.css';
-import { postLogin } from '@/lib/api';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import styles from '../login/login.module.css';
+import { postSignup } from '@/lib/api';
 
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
-  );
-}
-
-function LoginForm() {
+export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,15 +18,20 @@ function LoginForm() {
     setLoading(true);
     setError('');
 
-    const res = await postLogin({ email, password });
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      setLoading(false);
+      return;
+    }
+
+    const res = await postSignup({ name, email, password });
     if (res.error) {
       setError(res.error);
       setLoading(false);
       return;
     }
 
-    const redirectTo = searchParams.get('redirect') || '/scan';
-    router.push(redirectTo);
+    router.push('/scan');
   };
 
   return (
@@ -61,8 +57,8 @@ function LoginForm() {
         </div>
 
         <div className={styles.loginCard}>
-          <h2 className={styles.cardTitle}>Customer Login</h2>
-          <p className={styles.cardSubtitle}>Sign in to scan products and track your reports</p>
+          <h2 className={styles.cardTitle}>Create Your Account</h2>
+          <p className={styles.cardSubtitle}>Sign up to start verifying products and earn points for flagging counterfeits</p>
 
           {error && (
             <div className={styles.errorBanner}>
@@ -72,6 +68,23 @@ function LoginForm() {
           )}
 
           <form onSubmit={handleSubmit} className={styles.form}>
+            <div className={styles.inputGroup}>
+              <label htmlFor="name" className={styles.label}>Full Name</label>
+              <div className={styles.inputWrapper}>
+                <span className={`material-symbols-outlined ${styles.inputIcon}`}>person</span>
+                <input
+                  id="name"
+                  type="text"
+                  className={styles.input}
+                  placeholder="Your name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  required
+                  minLength={2}
+                />
+              </div>
+            </div>
+
             <div className={styles.inputGroup}>
               <label htmlFor="email" className={styles.label}>Email Address</label>
               <div className={styles.inputWrapper}>
@@ -89,19 +102,18 @@ function LoginForm() {
             </div>
 
             <div className={styles.inputGroup}>
-              <div className={styles.labelRow}>
-                <label htmlFor="password" className={styles.label}>Password</label>
-              </div>
+              <label htmlFor="password" className={styles.label}>Password</label>
               <div className={styles.inputWrapper}>
                 <span className={`material-symbols-outlined ${styles.inputIcon}`}>lock</span>
                 <input
                   id="password"
                   type="password"
                   className={styles.input}
-                  placeholder="••••••••"
+                  placeholder="At least 8 characters"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
+                  minLength={8}
                 />
               </div>
             </div>
@@ -110,12 +122,12 @@ function LoginForm() {
               {loading ? (
                 <>
                   <span className={`material-symbols-outlined ${styles.spinIcon}`}>progress_activity</span>
-                  Signing in...
+                  Creating account...
                 </>
               ) : (
                 <>
-                  <span className="material-symbols-outlined">login</span>
-                  Sign In
+                  <span className="material-symbols-outlined">person_add</span>
+                  Sign Up
                 </>
               )}
             </button>
@@ -123,16 +135,10 @@ function LoginForm() {
 
           <div className={styles.divider}><span>or</span></div>
 
-          <button className={styles.consumerBtn} onClick={() => router.push('/signup')}>
-            <span className="material-symbols-outlined">person_add</span>
-            Create an Account
+          <button className={styles.consumerBtn} onClick={() => router.push('/login')}>
+            <span className="material-symbols-outlined">login</span>
+            Already have an account? Sign In
           </button>
-
-          <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px' }}>
-            <Link href="/settings" style={{ color: 'var(--color-on-surface-variant)' }}>
-              Brand agent? Admin Portal →
-            </Link>
-          </p>
         </div>
       </div>
     </div>

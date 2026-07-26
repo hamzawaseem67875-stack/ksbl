@@ -111,6 +111,104 @@ export async function postScan(input: ScanInput): Promise<ApiResult<ScanResult>>
   }
 }
 
+// ─── Customer auth (/api/auth/*) ───────────────────────────────────────────────
+
+export interface CustomerProfile {
+  id: string;
+  name: string;
+  email: string;
+  score_points: number;
+}
+
+export async function postSignup(input: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<ApiResult<CustomerProfile>> {
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? `Signup failed (${res.status})`);
+    return ok(json as CustomerProfile);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error — check your connection');
+  }
+}
+
+export async function postLogin(input: {
+  email: string;
+  password: string;
+}): Promise<ApiResult<CustomerProfile>> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? `Login failed (${res.status})`);
+    return ok(json as CustomerProfile);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error — check your connection');
+  }
+}
+
+export async function postLogout(): Promise<void> {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch {
+    // best-effort
+  }
+}
+
+export async function getMe(): Promise<ApiResult<CustomerProfile>> {
+  try {
+    const res = await fetch('/api/auth/me');
+    const json = await res.json();
+    if (!res.ok || !json.authenticated) return err('Not authenticated');
+    return ok(json as CustomerProfile);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error — check your connection');
+  }
+}
+
+// ─── GET /api/scans/mine ────────────────────────────────────────────────────────
+
+export async function getMyScanHistory(limit = 20): Promise<ApiResult<ScanHistoryItem[]>> {
+  try {
+    const res = await fetch(`/api/scans/mine?limit=${limit}`);
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? `Failed to load scan history (${res.status})`);
+    return ok(json as ScanHistoryItem[]);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error — check your connection');
+  }
+}
+
+// ─── GET /api/leaderboard (admin-only) ─────────────────────────────────────────
+
+export interface LeaderboardEntry {
+  id: string;
+  name: string;
+  email: string;
+  score_points: number;
+}
+
+export async function getLeaderboard(): Promise<ApiResult<LeaderboardEntry[]>> {
+  try {
+    const res = await fetch('/api/leaderboard');
+    const json = await res.json();
+    if (!res.ok) return err(json.error ?? `Failed to load leaderboard (${res.status})`);
+    return ok(json as LeaderboardEntry[]);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : 'Network error — check your connection');
+  }
+}
+
 // ─── POST /api/report ─────────────────────────────────────────────────────────
 
 export async function postReport(

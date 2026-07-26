@@ -55,7 +55,11 @@ async function fetchImageBase64(url: string): Promise<{ data: string; mimeType: 
 export async function compareImagesWithGemini(
   capturedImageBase64: string,
   productInfo: UnifiedProduct | null,
-  capturedMimeType = "image/jpeg"
+  capturedMimeType = "image/jpeg",
+  /** Optional second (back/label) photo of the same product — improves
+   * accuracy since barcodes, batch codes, and ingredient lists are commonly
+   * printed on the back panel rather than the front-facing brand side. */
+  backImage?: { data: string | null; mimeType: string | null }
 ): Promise<GeminiComparisonResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -77,9 +81,10 @@ export async function compareImagesWithGemini(
 
     // Download the reference image if it exists to pass it to Gemini side-by-side
     const referenceImage = await fetchImageBase64(referenceImageURL);
+    const hasBackImage = !!(backImage?.data && backImage?.mimeType);
 
     // Build the query prompt
-    const prompt = `You are a product authenticity inspection expert. Your job is to compare a user's captured product photo with official product reference details.
+    const prompt = `You are a product authenticity inspection expert. Your job is to compare a user's captured product photo (or photos) with official product reference details.
 
 Official Reference Details:
 - Name: ${productName}
@@ -89,13 +94,17 @@ Official Reference Details:
 - Barcode: ${productBarcode}
 - Size/Weight: ${productSize}
 
-Inspect the captured image and evaluate the following:
+${hasBackImage
+  ? `You have been given TWO photos of the same physical product: the FRONT (brand-facing side) and the BACK (label side, which typically shows the barcode, batch code, ingredients/nutrition panel, and expiry date). Use both together as one combined assessment — for example, a barcode or batch code that's illegible or missing on the front may still be visible and checkable on the back.`
+  : `You have been given ONE photo of the product (its front, brand-facing side). No back/label photo was provided, so do not penalize the product for details that are only normally visible on a back label (e.g. don't assume a missing barcode means counterfeit if it's simply not shown in this photo) — assess only what is visible.`}
+
+Inspect the captured image(s) and evaluate the following:
 1. Logo Match: Check if the logo matches the official brand design (shapes, colors, details).
 2. Packaging Match: Check if the packaging colors, warnings, fonts, and materials match.
-3. Barcode Match: Check if the barcode on the packaging matches the reference barcode (${productBarcode}).
+3. Barcode Match: Check if the barcode visible in either photo matches the reference barcode (${productBarcode}).
 4. Brand Match: Check if the brand name and trademarks are spelled correctly and placed accurately.
 5. Design Match: Check if print alignments, labels, seals, and overall packaging design elements are correct.
-6. Tampering: Look for signs of tampering, broken seals, cuts, or fake glue.
+6. Tampering: Look for signs of tampering, broken seals, cuts, or fake glue, on either photo.
 7. Expiry & Print Quality: Assess whether the print quality is sharp/legible or blurry/low-quality (a common sign of counterfeit).
 
 Respond with a raw JSON object ONLY. Do not wrap the JSON in markdown code blocks (like \`\`\`json ... \`\`\`), do not output any extra comments or text.
@@ -112,7 +121,7 @@ Required JSON Structure:
   "reason": "Write a concise explanation of the verdict, highlighting any typography or printing anomalies."
 }
 
-Note: If no official reference data/image is available (unregistered product), compare the captured product photo against generic industry standards for authentic packaging for that brand and calculate matches accordingly, but reduce your confidence score (set confidence below 70).
+Note: If no official reference data/image is available (unregistered product), compare the captured product photo against generic industry standards for authentic packaging for that brand and calculate matches accordingly based purely on what you observe. Do not artificially lower your confidence score just because reference data is unavailable — base confidence solely on the visual evidence itself (print sharpness, logo accuracy, packaging consistency, absence of tampering). A clean, well-printed, tamper-free product should still score highly even with no reference data to compare against.
 
 Normalise all numeric scores to a scale of 0 to 100.`;
 
@@ -121,13 +130,23 @@ Normalise all numeric scores to a scale of 0 to 100.`;
     // Prepare content parts
     const parts: any[] = [];
 
-    // Add captured image
+    // Add captured front image
     parts.push({
       inlineData: {
         mimeType: capturedMimeType,
         data: capturedImageBase64,
       },
     });
+
+    // Add captured back/label image, if provided
+    if (hasBackImage) {
+      parts.push({
+        inlineData: {
+          mimeType: backImage!.mimeType!,
+          data: backImage!.data!,
+        },
+      });
+    }
 
     // Add reference image side-by-side if successfully downloaded
     if (referenceImage) {

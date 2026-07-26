@@ -18,6 +18,10 @@ const fallbackUrl = "postgresql://postgres:postgres@localhost:5432/shelfwatch";
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),
   datasource: {
-    url: process.env.DATABASE_URL || fallbackUrl,
+    // DIRECT_URL (session-mode pooler, port 5432) supports DDL and is what
+    // migrate/push/seed need. DATABASE_URL (PgBouncer transaction mode, port
+    // 6543) does not support DDL — @prisma/config's Datasource type has no
+    // separate directUrl field, so it must be selected here instead.
+    url: process.env.DIRECT_URL || process.env.DATABASE_URL || fallbackUrl,
   },
 });

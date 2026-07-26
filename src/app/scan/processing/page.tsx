@@ -46,6 +46,7 @@ export default function ScanProcessingPage() {
     requestFired.current = true;
 
     const base64Image = sessionStorage.getItem('shelfwatch_captured_image');
+    const base64BackImage = sessionStorage.getItem('shelfwatch_captured_image_back');
     const barcode = sessionStorage.getItem('shelfwatch_captured_barcode') || '';
 
     // Step state transition timer tracker
@@ -76,7 +77,12 @@ export default function ScanProcessingPage() {
           const file = dataURLtoFile(base64Image, 'scan.jpg');
           formData.append('capturedImage', file);
         }
-        
+
+        if (base64BackImage) {
+          const backFile = dataURLtoFile(base64BackImage, 'scan-back.jpg');
+          formData.append('capturedImageBack', backFile);
+        }
+
         if (barcode) {
           formData.append('barcode', barcode);
         }

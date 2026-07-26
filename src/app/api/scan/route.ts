@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyProduct } from "@/lib/verifyProduct";
+import { getCustomerIdFromRequest } from "@/lib/customer";
 
 // ─── Input validation ─────────────────────────────────────────────────────────
 
@@ -81,6 +82,10 @@ export async function POST(req: NextRequest) {
 
   const { barcode, latitude, longitude, area_name, scanned_by_role } = parsed.data;
 
+  // Read the logged-in customer's id from the session cookie — never trust a
+  // client-supplied customer id in the request body.
+  const customerId = await getCustomerIdFromRequest(req);
+
   // ── Run verification pipeline ──────────────────────────────────────────────
   try {
     const result = await verifyProduct({
@@ -90,6 +95,7 @@ export async function POST(req: NextRequest) {
       longitude: longitude ?? null,
       area_name: area_name ?? null,
       scanned_by_role,
+      customer_id: customerId,
     });
 
     return NextResponse.json(result, { status: 200 });

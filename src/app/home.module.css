@@ -77,7 +77,26 @@
   letter-spacing: -0.01em;
 }
 
-.nav { display: flex; gap: 1rem; }
+.nav { display: flex; align-items: center; gap: 1rem; }
+
+.adminNavLink {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.25rem;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-on-surface-variant);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+.adminNavLink:hover {
+  color: var(--color-primary);
+}
+.adminNavLink .material-symbols-outlined {
+  font-size: 16px;
+}
 
 .loginBtn {
   padding: 0.5rem 1.25rem;

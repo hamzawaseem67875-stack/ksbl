@@ -1,9 +1,141 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import styles from './settings.module.css';
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsGate />
+    </Suspense>
+  );
+}
+
+/**
+ * Gates the rest of the (desktop) admin portal. Deliberately NOT protected by
+ * src/proxy.ts (unlike /dashboard, /analytics, /inventory, /reports) — this
+ * page hosts the admin login form itself, so proxy-redirecting it away would
+ * make the login screen unreachable once logged out.
+ */
+function SettingsGate() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/admin/me')
+      .then(r => r.json())
+      .then(json => setAuthState(json.authenticated ? 'authenticated' : 'unauthenticated'))
+      .catch(() => setAuthState('unauthenticated'));
+  }, []);
+
+  const handleAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/auth/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setLoginError(json.error || 'Login failed');
+        setLoginLoading(false);
+        return;
+      }
+      setAuthState('authenticated');
+      const redirectTo = searchParams.get('redirect');
+      if (redirectTo && redirectTo !== '/settings') {
+        router.push(redirectTo);
+      }
+    } catch {
+      setLoginError('Network error — check your connection');
+      setLoginLoading(false);
+    }
+  };
+
+  const handleAdminLogout = async () => {
+    await fetch('/api/auth/admin/logout', { method: 'POST' });
+    setAuthState('unauthenticated');
+  };
+
+  if (authState === 'loading') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Settings</h1>
+        </div>
+      </div>
+    );
+  }
+
+  if (authState === 'unauthenticated') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Admin Login</h1>
+          <p className={styles.subtitle}>Sign in to manage brand protection settings</p>
+        </div>
+        <div className={styles.sections}>
+          <section className={styles.card} style={{ maxWidth: '420px' }}>
+            {loginError && (
+              <div style={{
+                background: 'rgba(255,80,80,0.12)',
+                border: '1px solid rgba(255,80,80,0.3)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                marginBottom: '16px',
+                color: 'var(--color-error)',
+                fontSize: '14px',
+              }}>
+                {loginError}
+              </div>
+            )}
+            <form onSubmit={handleAdminLogin} className={styles.fields}>
+              <div className={styles.fieldRow}>
+                <label className={styles.fieldLabel}>Admin Email</label>
+                <input
+                  type="email"
+                  className={styles.input}
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  required
+                />
+              </div>
+              <div className={styles.fieldRow}>
+                <label className={styles.fieldLabel}>Password</label>
+                <input
+                  type="password"
+                  className={styles.input}
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+              <button type="submit" className={styles.btnPrimary} disabled={loginLoading} style={{ marginTop: '8px' }}>
+                <span className="material-symbols-outlined">login</span>
+                {loginLoading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  return <SettingsContent onLogout={handleAdminLogout} />;
+}
+
+function SettingsContent({ onLogout }: { onLogout: () => void }) {
   const [notifications, setNotifications] = useState({
     email: true,
     sms: false,
@@ -36,9 +168,15 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Settings</h1>
-        <p className={styles.subtitle}>Manage your account, preferences, and integrations</p>
+      <div className={styles.header} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 className={styles.title}>Settings</h1>
+          <p className={styles.subtitle}>Manage your account, preferences, and integrations</p>
+        </div>
+        <button className={styles.btnOutlined} onClick={onLogout}>
+          <span className="material-symbols-outlined">logout</span>
+          Log Out
+        </button>
       </div>
 
       <div className={styles.sections}>

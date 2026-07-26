@@ -116,6 +116,107 @@
   margin-top: 1.5rem;
 }
 
+/* Photo review / confirm step (front + optional back) */
+.photoReviewSection {
+  padding: 1.5rem 1.25rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.photoSlotRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+.photoSlot {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 0.875rem;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: #000;
+}
+
+.photoSlotImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photoSlotLabel {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  background: rgba(7, 14, 29, 0.85);
+  color: var(--color-on-surface);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  letter-spacing: 0.03em;
+}
+
+.photoSlotRemove {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: rgba(7, 14, 29, 0.85);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--color-on-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.photoSlotRemove:hover:not(:disabled) { background: rgba(255,80,80,0.3); }
+.photoSlotRemove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.addBackSlot {
+  aspect-ratio: 1;
+  border-radius: 0.875rem;
+  border: 1px dashed rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.02);
+  color: var(--color-on-surface-variant);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.addBackSlot:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(70,241,197,0.05);
+}
+.addBackSlot:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.optionalTag {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.photoReviewHint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-on-surface-variant);
+  opacity: 0.75;
+  text-align: center;
+}
+
 /* Manual input */
 .manualSection {
   padding: 1.5rem 1.25rem;

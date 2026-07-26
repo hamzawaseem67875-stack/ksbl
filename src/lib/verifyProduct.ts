@@ -21,6 +21,7 @@ import { runOcr } from "./ocr";
 import { scorePackaging } from "./cv";
 import { getVerdictText, getVerdictTextSync, compareProductImages } from "./translate";
 import { findProductByImage, type VectorMatch } from "./vectorSearch";
+import { incrementCustomerScore } from "./customer";
 import type { Verdict, ScannedByRole } from "@prisma/client";
 
 // ─── Thresholds ───────────────────────────────────────────────────────────────
@@ -87,6 +88,8 @@ export interface VerifyInput {
   longitude?: number | null;
   area_name?: string | null;
   scanned_by_role?: ScannedByRole;
+  /** Logged-in customer id (from the customer_session cookie), if any. */
+  customer_id?: string | null;
 }
 
 export interface VerifyResult {
@@ -452,6 +455,7 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
           latitude: scanLat,
           longitude: scanLng,
           area_name: scanArea,
+          customer_id: input.customer_id ?? null,
         }),
       });
 
@@ -464,6 +468,11 @@ export async function verifyProduct(input: VerifyInput): Promise<VerifyResult> {
     } catch (err) {
       console.error("[verifyProduct] Failed to write scan to DB via REST:", err);
     }
+  }
+
+  // Award scorecard points for catching a suspicious/counterfeit scan
+  if (verdict === "suspicious" && input.customer_id) {
+    await incrementCustomerScore(input.customer_id, 10);
   }
 
   // ── Step 7: Write Report row if suspicious ────────────────────────────────

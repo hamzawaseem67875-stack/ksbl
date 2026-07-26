@@ -4,6 +4,27 @@
  * Extracts/reads a barcode from a captured image using Gemini Vision API.
  */
 
+/**
+ * Validates the EAN-13/UPC-A check digit (standard GS1 algorithm). A vision
+ * model "reading" printed digits (rather than decoding the actual barcode
+ * bar pattern) will occasionally misread a single digit — that produces a
+ * number that looks plausible but fails checksum, which then wastes external
+ * API lookups searching for a barcode that was never real. Formats other
+ * than 12/13 digits (EAN-8, Code 128, etc.) aren't checked here and pass
+ * through as-is.
+ */
+function isValidEanChecksum(digits: string): boolean {
+  if (digits.length !== 12 && digits.length !== 13) return true;
+  const padded = digits.length === 12 ? `0${digits}` : digits;
+  const checkDigit = Number(padded[12]);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += Number(padded[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const computed = (10 - (sum % 10)) % 10;
+  return computed === checkDigit;
+}
+
 export async function scanBarcodeFromImage(
   imageBase64: string,
   mimeType = "image/jpeg"
@@ -62,7 +83,17 @@ Do not output any other words, markdown, or text.`;
 
     // Clean up any extra whitespace/characters
     const cleanDigits = resultText.replace(/\D/g, "");
-    return cleanDigits.length >= 8 ? cleanDigits : null;
+    if (cleanDigits.length < 8) return null;
+
+    if (!isValidEanChecksum(cleanDigits)) {
+      console.warn(
+        `[BarcodeScanner] Gemini read "${cleanDigits}" but it fails EAN/UPC checksum validation — ` +
+        `likely a misread digit from the photo. Discarding rather than searching for a barcode that isn't real.`
+      );
+      return null;
+    }
+
+    return cleanDigits;
   } catch (err) {
     console.error("[BarcodeScanner] Failed to scan barcode from image:", err);
     return null;

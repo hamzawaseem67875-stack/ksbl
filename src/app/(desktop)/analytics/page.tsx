@@ -36,7 +36,12 @@ export default function AnalyticsPage() {
   const [recentScans, setRecentScans] = useState<ScanHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  // Starts as null (not `new Date()`) so the server-rendered HTML and the
+  // client's first render match exactly — computing it eagerly here would
+  // give SSR and hydration two different Date instances (and, depending on
+  // the server/browser's default locale, two different formatted strings),
+  // causing a hydration mismatch. The real value is set post-mount below.
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   async function loadDashboardData() {
     setLoading(true);
@@ -129,7 +134,7 @@ export default function AnalyticsPage() {
       </div>
 
       <p style={{ fontSize: '12px', color: 'var(--color-on-surface-variant)', opacity: 0.6, marginTop: '-12px', marginBottom: '24px' }}>
-        Last refreshed: {lastRefreshed.toLocaleTimeString()}
+        Last refreshed: {lastRefreshed ? lastRefreshed.toLocaleTimeString('en-US', { hour12: true }) : '—'}
       </p>
 
       {/* Metrics container with loading state overlay */}

@@ -12,7 +12,14 @@ export default function ScanPage() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
+
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [frontPreview, setFrontPreview] = useState<string | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
+  const [backPreview, setBackPreview] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch recent scans on mount
   useEffect(() => {
@@ -29,40 +36,44 @@ export default function ScanPage() {
     getGeolocation();
   }, []);
 
-  // Convert captured file to base64 and save to sessionStorage, then navigate to /scan/processing
-  const submitScan = async (imageFile: File | null, barcodeVal: string) => {
+  // Convert captured file(s) to base64 and save to sessionStorage, then navigate to /scan/processing
+  const submitScan = async (front: File | null, back: File | null, barcodeVal: string) => {
     setScanning(true);
     setError(null);
 
-    try {
-      if (imageFile) {
+    const readAsDataUrl = (file: File): Promise<string> =>
+      new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          try {
-            const base64Data = reader.result as string;
-            sessionStorage.setItem('shelfwatch_captured_image', base64Data);
-            sessionStorage.setItem('shelfwatch_captured_barcode', barcodeVal || '');
-            router.push('/scan/processing');
-          } catch (storageErr) {
-            console.error('Failed to store base64 image in sessionStorage:', storageErr);
-            setError('Image is too large. Please capture/upload a smaller photo.');
-            setScanning(false);
-          }
-        };
-        reader.onerror = () => {
-          setError('Failed to read image file.');
-          setScanning(false);
-        };
-        reader.readAsDataURL(imageFile);
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read image file.'));
+        reader.readAsDataURL(file);
+      });
+
+    try {
+      if (front) {
+        const frontData = await readAsDataUrl(front);
+        sessionStorage.setItem('shelfwatch_captured_image', frontData);
+
+        if (back) {
+          const backData = await readAsDataUrl(back);
+          sessionStorage.setItem('shelfwatch_captured_image_back', backData);
+        } else {
+          sessionStorage.removeItem('shelfwatch_captured_image_back');
+        }
       } else {
-        // Barcode only lookup
+        // Barcode-only lookup, no photo
         sessionStorage.removeItem('shelfwatch_captured_image');
-        sessionStorage.setItem('shelfwatch_captured_barcode', barcodeVal || '');
-        router.push('/scan/processing');
+        sessionStorage.removeItem('shelfwatch_captured_image_back');
       }
+
+      sessionStorage.setItem('shelfwatch_captured_barcode', barcodeVal || '');
+      router.push('/scan/processing');
     } catch (err) {
       console.error('[ScanPage] Prep failed:', err);
-      setError('Something went wrong. Please try again.');
+      const message = err instanceof Error && err.message.includes('read')
+        ? err.message
+        : 'Image is too large. Please capture/upload a smaller photo.';
+      setError(message);
       setScanning(false);
     }
   };
@@ -72,17 +83,42 @@ export default function ScanPage() {
       setError('Please enter a barcode or upload an image.');
       return;
     }
-    submitScan(null, barcode.trim());
+    submitScan(null, null, barcode.trim());
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFrontFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    submitScan(file, barcode.trim());
+    setError(null);
+    setFrontImage(file);
+    setFrontPreview(URL.createObjectURL(file));
   };
 
-  const handleCameraClick = () => {
-    fileInputRef.current?.click();
+  const handleBackFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError(null);
+    setBackImage(file);
+    setBackPreview(URL.createObjectURL(file));
+  };
+
+  const handleRetakeFront = () => {
+    setFrontImage(null);
+    setFrontPreview(null);
+    setBackImage(null);
+    setBackPreview(null);
+  };
+
+  const handleRemoveBack = () => {
+    setBackImage(null);
+    setBackPreview(null);
+  };
+
+  const handleVerifyPhotos = () => {
+    if (!frontImage) return;
+    submitScan(frontImage, backImage, barcode.trim());
   };
 
   return (
@@ -98,31 +134,83 @@ export default function ScanPage() {
       </header>
 
       <main className={styles.main}>
-        {/* Viewfinder — triggers file/camera upload */}
-        <div className={styles.viewfinderContainer} onClick={handleCameraClick} style={{ cursor: 'pointer' }}>
-          <div className={styles.viewfinder}>
-            <div className={styles.cornerTL}></div>
-            <div className={styles.cornerTR}></div>
-            <div className={styles.cornerBL}></div>
-            <div className={styles.cornerBR}></div>
-            {!scanning && <div className={styles.scanLine}></div>}
-            <div className={styles.viewfinderLabel}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                {scanning ? 'progress_activity' : 'photo_camera'}
-              </span>
-              {scanning ? 'Verifying with AI (may take up to 8s)...' : 'Tap to upload product photo'}
+        {!frontPreview ? (
+          /* Viewfinder — triggers file/camera upload for the front photo */
+          <div className={styles.viewfinderContainer} onClick={() => fileInputRef.current?.click()} style={{ cursor: 'pointer' }}>
+            <div className={styles.viewfinder}>
+              <div className={styles.cornerTL}></div>
+              <div className={styles.cornerTR}></div>
+              <div className={styles.cornerBL}></div>
+              <div className={styles.cornerBR}></div>
+              <div className={styles.scanLine}></div>
+              <div className={styles.viewfinderLabel}>
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>photo_camera</span>
+                Tap to upload product photo (Front)
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Front (+ optional back) photo preview / confirm step */
+          <div className={styles.photoReviewSection}>
+            <div className={styles.photoSlotRow}>
+              <div className={styles.photoSlot}>
+                <img src={frontPreview} alt="Front of product" className={styles.photoSlotImg} />
+                <span className={styles.photoSlotLabel}>Front</span>
+                <button className={styles.photoSlotRemove} onClick={handleRetakeFront} disabled={scanning} title="Retake">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                </button>
+              </div>
 
-        {/* Hidden file input for camera/gallery */}
+              {backPreview ? (
+                <div className={styles.photoSlot}>
+                  <img src={backPreview} alt="Back of product" className={styles.photoSlotImg} />
+                  <span className={styles.photoSlotLabel}>Back</span>
+                  <button className={styles.photoSlotRemove} onClick={handleRemoveBack} disabled={scanning} title="Remove">
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className={styles.addBackSlot}
+                  onClick={() => backFileInputRef.current?.click()}
+                  disabled={scanning}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>add_a_photo</span>
+                  Add Back Photo
+                  <span className={styles.optionalTag}>Optional</span>
+                </button>
+              )}
+            </div>
+
+            <p className={styles.photoReviewHint}>
+              {backPreview
+                ? 'Front and back photos will both be checked — this improves accuracy for barcodes and print details on the back label.'
+                : 'Adding a back/label photo is optional but improves accuracy, especially for barcodes printed on the back panel.'}
+            </p>
+
+            <button className={styles.scanBtn} onClick={handleVerifyPhotos} disabled={scanning}>
+              <span className="material-symbols-outlined">{scanning ? 'progress_activity' : 'verified'}</span>
+              {scanning ? 'Verifying with AI (may take up to 8s)...' : 'Verify Product'}
+            </button>
+          </div>
+        )}
+
+        {/* Hidden file inputs for camera/gallery */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           capture="environment"
           style={{ display: 'none' }}
-          onChange={handleFileUpload}
+          onChange={handleFrontFileChange}
+        />
+        <input
+          ref={backFileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={handleBackFileChange}
         />
 
         {/* Error display */}
@@ -154,18 +242,20 @@ export default function ScanPage() {
               placeholder="e.g. 8901030873874"
               value={barcode}
               onChange={e => setBarcode(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleBarcodeScan()}
+              onKeyDown={e => e.key === 'Enter' && !frontImage && handleBarcodeScan()}
               disabled={scanning}
             />
           </div>
-          <button
-            className={styles.scanBtn}
-            onClick={handleBarcodeScan}
-            disabled={scanning}
-          >
-            <span className="material-symbols-outlined">{scanning ? 'progress_activity' : 'search'}</span>
-            {scanning ? 'Verifying with AI...' : 'Verify Product'}
-          </button>
+          {!frontImage && (
+            <button
+              className={styles.scanBtn}
+              onClick={handleBarcodeScan}
+              disabled={scanning}
+            >
+              <span className="material-symbols-outlined">{scanning ? 'progress_activity' : 'search'}</span>
+              {scanning ? 'Verifying with AI...' : 'Verify Product'}
+            </button>
+          )}
         </div>
 
         {/* Recent Scans */}

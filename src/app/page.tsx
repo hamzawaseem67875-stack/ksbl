@@ -34,7 +34,11 @@ export default function HomePage() {
           ShelfWatch
         </div>
         <nav className={styles.nav}>
-          <Link href="/login" className={styles.loginBtn}>Agent Login</Link>
+          <Link href="/settings" className={styles.adminNavLink} title="Brand agent or admin portal">
+            <span className="material-symbols-outlined">security</span>
+            Admin Portal
+          </Link>
+          <Link href="/login" className={styles.loginBtn}>Log In</Link>
         </nav>
       </header>
 
@@ -54,16 +58,15 @@ export default function HomePage() {
         <p className={styles.heroUrdu}>پاکستانی مارکیٹ میں مصنوعات کی صداقت فوری طور پر تصدیق کریں</p>
 
         <div className={styles.heroCta}>
-          <Link href="/scan" className={styles.primaryBtn}>
+          <Link href="/signup" className={styles.primaryBtn}>
             <span className="material-symbols-outlined">qr_code_scanner</span>
-            Start Scanning
+            Sign Up &amp; Start Scanning
           </Link>
           <Link href="/login" className={styles.secondaryBtn}>
-            <span className="material-symbols-outlined">security</span>
-            Agent Portal
+            <span className="material-symbols-outlined">login</span>
+            Log In
           </Link>
         </div>
-
         {/* Stats Row */}
         <div className={styles.statsRow}>
           <div className={styles.statCard}>

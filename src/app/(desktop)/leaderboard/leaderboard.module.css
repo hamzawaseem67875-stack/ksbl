@@ -1,0 +1,110 @@
+.page {
+  padding: 2rem;
+  max-width: 1400px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.25rem;
+}
+.subtitle {
+  font-size: 14px;
+  color: var(--color-on-surface-variant);
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.5rem;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-inter), sans-serif;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--color-on-surface-variant);
+}
+.filterBtn:hover { background: rgba(255,255,255,0.07); }
+.filterBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tableCard {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+}
+
+.tableHeader { display: flex; justify-content: space-between; align-items: center; }
+
+.cardTitle {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.tableWrapper { overflow-x: auto; margin-top: 1rem; }
+.table { width: 100%; border-collapse: collapse; }
+.th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(59,74,68,0.2);
+}
+.tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s;
+}
+.tr:hover { background: rgba(255,255,255,0.025); }
+.td {
+  padding: 0.875rem 1rem;
+  font-size: 14px;
+  color: var(--color-on-surface);
+  vertical-align: middle;
+}
+
+.rankBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--color-on-surface-variant);
+  white-space: nowrap;
+}
+
+.pointsBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: rgba(70,241,197,0.1);
+  border: 1px solid rgba(70,241,197,0.3);
+}

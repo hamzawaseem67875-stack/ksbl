@@ -31,7 +31,7 @@ interface VerificationResult {
   score: number;
   product: ProductData;
   gemini: GeminiData;
-  apiSource: "UPCItemDB" | "OpenFoodFacts" | "BarcodeLookup" | "none";
+  apiSource: "LocalCatalog" | "ScraperMatch" | "UPCItemDB" | "OpenFoodFacts" | "BarcodeLookup" | "none";
   reason: string;
   barcodeDetected: boolean;
 }
@@ -97,6 +97,14 @@ export default function ResultPage() {
     reason: "No visual analysis details available.",
   };
   const apiSource = result?.apiSource || "none";
+  const apiSourceLabels: Record<string, string> = {
+    none: "None (Identified visually by Gemini)",
+    LocalCatalog: "ShelfWatch Verified Catalog",
+    ScraperMatch: "ShelfWatch Catalog (Image Match)",
+    UPCItemDB: "UPCItemDB",
+    OpenFoodFacts: "Open Food Facts",
+    BarcodeLookup: "BarcodeLookup.com",
+  };
   const reason = result?.reason || "Visual inspection could not be verified securely.";
 
   // Theme styling configurations based on status
@@ -246,7 +254,7 @@ export default function ResultPage() {
             <div style={{ gridColumn: 'span 2' }}>
               <p className={styles.labelCaps}>API Lookup Source</p>
               <p className={styles.detailValue} style={{ color: 'var(--color-primary)' }}>
-                {apiSource === "none" ? "None (Identified visually by Gemini)" : apiSource}
+                {apiSourceLabels[apiSource] || apiSource}
               </p>
             </div>
           </div>

@@ -107,12 +107,24 @@ model ScrapeRun {
   @@index([status])
 }
 
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password_hash String
+  score_points  Int      @default(0)
+  created_at    DateTime @default(now())
+
+  scans Scan[]
+}
+
 model Scan {
   id               String        @id @default(cuid())
   product_id       String?       // nullable — no match found = unverified
   product_name     String?       // Cache product name for fallback lookups (UPCItemDB/OpenFoodFacts)
   brand_name       String?       // Cache brand name for fallback lookups (UPCItemDB/OpenFoodFacts)
   scanned_by_role  ScannedByRole @default(consumer)
+  customer_id      String?       // nullable — set when a logged-in consumer performed the scan
   image_url        String
   extracted_batch  String?
   extracted_mfg_date String?
@@ -128,12 +140,14 @@ model Scan {
   created_at       DateTime      @default(now())
 
   product  Product? @relation(fields: [product_id], references: [id])
+  customer User?    @relation(fields: [customer_id], references: [id])
   reports  Report[]
 
   @@index([product_id])
   @@index([verdict])
   @@index([area_name])
   @@index([created_at])
+  @@index([customer_id])
 }
 
 model Report {

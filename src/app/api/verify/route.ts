@@ -20,6 +20,30 @@ import { runComparisonEngine } from "@/services/comparisonEngine";
 import { calculateAuthenticityScore } from "@/services/scoreEngine";
 import { getCachedProduct, setCachedProduct, UnifiedProduct } from "@/services/cacheService";
 import { uploadImage } from "@/lib/blob";
+import { getCustomerIdFromRequest, incrementCustomerScore } from "@/lib/customer";
+import { findProductByImage } from "@/lib/vectorSearch";
+/** Maps a row from our own local "Product" table (sku, brand_name, product_name,
+ * reference_image_url, pack_size...) to the same shape used everywhere else
+ * (UnifiedProduct) — local catalog and scraper-matched rows share this shape
+ * since they both come from the same table, just via different lookup paths. */
+function mapLocalProductToUnified(p: {
+  product_name: string;
+  brand_name: string;
+  sku: string;
+  pack_size?: string | null;
+  reference_image_url?: string | null;
+}): UnifiedProduct {
+  return {
+    name: p.product_name,
+    brand: p.brand_name,
+    manufacturer: p.brand_name,
+    category: "Registered Product",
+    barcode: p.sku,
+    size: p.pack_size || "Standard",
+    referenceImage: p.reference_image_url || "",
+  };
+}
+
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
@@ -65,6 +89,8 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
+    const customerId = await getCustomerIdFromRequest(req);
+
     let formData: FormData;
     try {
       formData = await req.formData();
@@ -75,8 +101,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Read input image and barcode
+    // 1. Read input image(s) and barcode. The back photo is optional — most
+    // FMCG barcodes and batch/expiry print are on the back/label panel, so
+    // when it's provided it's used as a secondary barcode-read source and
+    // passed to Gemini alongside the front photo for a fuller comparison.
     const imageFile = formData.get("capturedImage") || formData.get("image");
+    const backImageFile = formData.get("capturedImageBack");
     let barcode = formData.get("barcode") as string | null;
 
     if (!imageFile || typeof imageFile === "string") {
@@ -86,24 +116,94 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convert file to base64 for scanning and Gemini Vision
+    // Convert file(s) to base64 for scanning and Gemini Vision
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const imageBase64 = buffer.toString("base64");
     const mimeType = imageFile.type || "image/jpeg";
 
-    // 2. Barcode Scanning Fallback (if not passed directly)
+    let backImageBase64: string | null = null;
+    let backMimeType: string | null = null;
+    if (backImageFile && typeof backImageFile !== "string") {
+      const backArrayBuffer = await backImageFile.arrayBuffer();
+      backImageBase64 = Buffer.from(backArrayBuffer).toString("base64");
+      backMimeType = backImageFile.type || "image/jpeg";
+    }
+
+    // 2. Barcode Scanning Fallback (if not passed directly) — try the front
+    // photo first, then the back photo if the front didn't have a readable one.
     if (!barcode || barcode.trim() === "") {
       console.log("[VerifyAPI] No barcode provided in request. Running visual scanner...");
       barcode = await scanBarcodeFromImage(imageBase64, mimeType);
-      console.log(`[VerifyAPI] Visual scanner result: ${barcode}`);
+      console.log(`[VerifyAPI] Visual scanner result (front): ${barcode}`);
+
+      if (!barcode && backImageBase64 && backMimeType) {
+        barcode = await scanBarcodeFromImage(backImageBase64, backMimeType);
+        console.log(`[VerifyAPI] Visual scanner result (back): ${barcode}`);
+      }
     }
 
-    // 3. Database Lookup & Fallbacks (only if barcode exists)
-    let product: UnifiedProduct | null = null;
-    let apiSource: "UPCItemDB" | "OpenFoodFacts" | "BarcodeLookup" | "none" = "none";
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (barcode) {
+    // Upload image early — needed for the vector/scraper-catalog match below,
+    // and for the DB scan record either way.
+    const filename = `scan-${Date.now()}.jpg`;
+    let imageUrl: string;
+    try {
+      imageUrl = await uploadImage(filename, imageFile);
+    } catch (err) {
+      console.error("[VerifyAPI] Image upload failed:", err);
+      imageUrl = `https://placeholder.shelfwatch.pk/scan/${filename}`;
+    }
+
+    // 3. Identify the product. Our own catalog (local barcode/SKU match, or a
+    // scraper-catalog visual match) is authoritative and checked first — it's
+    // the same data Gemini should compare against and the same data the
+    // result screen should display, so this single lookup feeds everything
+    // downstream instead of leaving the UI showing "Unregistered/Unknown"
+    // for a scan that was actually identified.
+    let localProductRow: { id: string; product_name: string; brand_name: string; sku: string; pack_size?: string | null; reference_image_url?: string | null } | null = null;
+    let dbProductId: string | null = null;
+
+    if (barcode && supabaseUrl && anonKey) {
+      try {
+        const prodRes = await fetch(`${supabaseUrl}/rest/v1/Product?sku=eq.${encodeURIComponent(barcode.trim())}&select=*`, {
+          headers: { "apikey": anonKey, "Authorization": `Bearer ${anonKey}` }
+        });
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          if (prodData && prodData.length > 0) {
+            localProductRow = prodData[0];
+            dbProductId = prodData[0].id;
+          }
+        }
+      } catch (err) {
+        console.error("[VerifyAPI] Failed to fetch local product via REST:", err);
+      }
+    }
+
+    // RAG-style match against the scraped product catalog (Product.embedding,
+    // via the match_products RPC — see prisma/sql/pgvector_setup.sql). Only
+    // run if a barcode match didn't already identify the product, since it's
+    // the same catalog either way.
+    const vectorMatch = localProductRow ? null : await findProductByImage(imageUrl);
+    if (vectorMatch && !dbProductId) {
+      dbProductId = vectorMatch.product.id;
+    }
+
+    // 4. External DB Lookup & Fallbacks — only when our own catalog didn't
+    // already identify the product (only if barcode exists).
+    let product: UnifiedProduct | null = null;
+    let apiSource: "LocalCatalog" | "ScraperMatch" | "UPCItemDB" | "OpenFoodFacts" | "BarcodeLookup" | "none" = "none";
+
+    if (localProductRow) {
+      product = mapLocalProductToUnified(localProductRow);
+      apiSource = "LocalCatalog";
+    } else if (vectorMatch) {
+      product = mapLocalProductToUnified(vectorMatch.product);
+      apiSource = "ScraperMatch";
+    } else if (barcode) {
       const cleanBarcode = barcode.trim();
 
       // Check Cache Service (24 hours)
@@ -112,17 +212,17 @@ export async function POST(req: NextRequest) {
         product = cached;
         apiSource = "UPCItemDB"; // Map cached to source or use generic cache indication
       } else {
-        // Step 3.1: UPCItemDB
+        // Step 4.1: UPCItemDB
         product = await lookupUPCItemDB(cleanBarcode);
         if (product) {
           apiSource = "UPCItemDB";
         } else {
-          // Step 3.2: Open Food Facts
+          // Step 4.2: Open Food Facts
           product = await lookupOpenFoodFacts(cleanBarcode);
           if (product) {
             apiSource = "OpenFoodFacts";
           } else {
-            // Step 3.3: Barcode Lookup
+            // Step 4.3: Barcode Lookup
             product = await lookupBarcodeLookup(cleanBarcode);
             if (product) {
               apiSource = "BarcodeLookup";
@@ -137,79 +237,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Gemini Vision Packaging Verification
+    // 5. Gemini Vision Packaging Verification — now sees whichever reference
+    // product we actually identified (local catalog / scraper match /
+    // external DB), not just external-API results.
     console.log("[VerifyAPI] Running Gemini Vision Comparison...");
-    const gemini = await compareImagesWithGemini(imageBase64, product, mimeType);
+    const gemini = await compareImagesWithGemini(imageBase64, product, mimeType, {
+      data: backImageBase64,
+      mimeType: backMimeType,
+    });
 
-    // 5. Comparison Engine Match Verification
+    // 6. Comparison Engine Match Verification
     const comparison = runComparisonEngine(barcode, product, gemini);
 
-    // 6. Calculate authenticity score
+    // 7. Calculate authenticity score
     const scoring = calculateAuthenticityScore(comparison);
+    const finalScore = scoring.score;
 
-    // If no barcode was detected, reduce final score to reflect missing validation
-    let finalScore = scoring.score;
-    if (!barcode) {
-      // Missing barcode validation penalty (already partially capped by 0 barcodeMatch score in formula,
-      // let's ensure it stays below 70 as per instruction rule "automatically reduce final confidence/score")
-      finalScore = Math.min(finalScore, 65);
-    }
-
-    // Status Rules:
-    // 90-100 -> "Likely Original"
-    // 70-89 -> "Needs Manual Review"
-    // Below 70 -> "Likely Counterfeit"
+    // Status Rules — mirrors the dbVerdict thresholds below exactly, so the
+    // on-screen result never contradicts what gets stored/shown everywhere
+    // else (dashboard, leaderboard, scan history).
     let status: "Likely Original" | "Needs Manual Review" | "Likely Counterfeit";
-    if (finalScore >= 90) {
+    if (finalScore > 50) {
       status = "Likely Original";
-    } else if (finalScore >= 70) {
-      status = "Needs Manual Review";
-    } else {
+    } else if (finalScore < 10) {
       status = "Likely Counterfeit";
-    }
-
-    // Upload image to get public URL for database scan history
-    const filename = `scan-${Date.now()}.jpg`;
-    let imageUrl: string;
-    try {
-      imageUrl = await uploadImage(filename, imageFile);
-    } catch (err) {
-      console.error("[VerifyAPI] Image upload failed:", err);
-      imageUrl = `https://placeholder.shelfwatch.pk/scan/${filename}`;
-    }
-
-    // Write scan record to DB so it shows up in history!
-    let dbProductId: string | null = null;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (barcode && supabaseUrl && anonKey) {
-      try {
-        const prodRes = await fetch(`${supabaseUrl}/rest/v1/Product?sku=eq.${barcode.trim()}`, {
-          method: "GET",
-          headers: {
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`
-          }
-        });
-        if (prodRes.ok) {
-          const prodData = await prodRes.json();
-          if (prodData && prodData.length > 0) {
-            dbProductId = prodData[0].id;
-          }
-        }
-      } catch (err) {
-        console.error("[VerifyAPI] Failed to fetch product via REST:", err);
-      }
-    }
-
-    let dbVerdict: "genuine" | "suspicious" | "unverified" = "unverified";
-    if (finalScore > 70) {
-      dbVerdict = "genuine";
-    } else if (finalScore < 40) {
-      dbVerdict = "suspicious";
     } else {
+      status = "Needs Manual Review";
+    }
+
+    // A confirmed match against our own catalog (local barcode/SKU match or
+    // scraper visual match) is treated as a confirmed genuine identification,
+    // independent of the barcode/Gemini score below.
+    let dbVerdict: "genuine" | "suspicious" | "unverified" = "unverified";
+    if (localProductRow || vectorMatch) {
+      dbVerdict = "genuine";
+    } else if (finalScore > 50) {
+      dbVerdict = "genuine";
+    } else if (finalScore < 10) {
       dbVerdict = "unverified";
+    } else {
+      dbVerdict = "suspicious";
     }
 
     // Use the device's real GPS coordinates only — never fabricate a location.
@@ -237,6 +304,9 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({
             product_id: dbProductId,
+            // `product` already incorporates local catalog / scraper-match
+            // data (see the identification block above), so this alone
+            // covers all three source paths, not just external DB lookups.
             product_name: product?.name || null,
             brand_name: product?.brand || null,
             scanned_by_role: (formData.get("role") as any) || "consumer",
@@ -251,6 +321,7 @@ export async function POST(req: NextRequest) {
             latitude: scanLat,
             longitude: scanLng,
             area_name: scanArea,
+            customer_id: customerId,
           })
         });
         if (scanRes.ok) {
@@ -265,6 +336,11 @@ export async function POST(req: NextRequest) {
       } catch (dbErr) {
         console.error("[VerifyAPI] Failed to write scan record to DB via REST:", dbErr);
       }
+    }
+
+    // Award scorecard points for catching a suspicious/counterfeit scan
+    if (dbVerdict === "suspicious" && customerId) {
+      await incrementCustomerScore(customerId, 10);
     }
 
     // Return structured payload

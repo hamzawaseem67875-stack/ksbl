@@ -7,6 +7,7 @@ import styles from './Sidebar.module.css';
 const navItems = [
   { href: '/dashboard', icon: 'dashboard', label: 'OVERVIEW' },
   { href: '/analytics', icon: 'analytics', label: 'ANALYTICS' },
+  { href: '/leaderboard', icon: 'leaderboard', label: 'LEADERBOARD' },
   { href: '/inventory', icon: 'inventory_2', label: 'INVENTORY' },
   { href: '/scan/history', icon: 'history', label: 'SCAN HISTORY' },
   { href: '/reports', icon: 'description', label: 'REPORTS' },
