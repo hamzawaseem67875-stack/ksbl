@@ -33,8 +33,8 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env*.local
 .env
+.env.*
 !.env.example
 
 # vercel
@@ -43,6 +43,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDEs & OS
+.vscode/
+.idea/
+Thumbs.db
+*.swp
+*.swo
 
 # supabase config / credentials
 supabase.txt
